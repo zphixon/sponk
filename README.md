@@ -17,18 +17,19 @@
     * arrays
     * strings
 * functions
-  * left and right arguments
-* errors
-  * monadic
+  * lambda
+  * closures?
+  * left and right arguments?
+  * point-free style?
+* errors?
+  * end of the world, destroy everything
+  * monadic error handling
   * checked exceptions
 
 ## notes
 
 Some general Rust interpreter-writing thoughts.
 
-* method of interpretation
-  * tree-walking
-    * inflexible
 * ownership is the hard part
   * interpreter and enclosed values need to mutate each other
 * scope(vec\<hashmap\<string, value\>\>)
@@ -46,9 +47,11 @@ Some general Rust interpreter-writing thoughts.
   * scope: option\<scope\>
     * maybe rc\<refcell\>
     * function
-      * interpreter pushes value's scope before calling - would get expensive
+      * clones interpreter's scope upon creation - would get expensive
         * analysis to not waste memory
         * do nothing and allow reflection
+      * interpreter pushes value's scope before calling
+        * might allow for closures
     * instance
       * used for fields, methods
 
