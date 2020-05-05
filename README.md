@@ -99,6 +99,8 @@ db =: ] + ]
 
 ### Quotes
 
+multiple levels of quoting/unquoting in verb definitions?
+
 ```
     -- f expects its left argument to be a monadic function
     f =: [./ 2*]
@@ -144,7 +146,6 @@ how do we represent this in a sane way? adverbs, or higher-order functions.
   * x r@s y → x r (s y) → x r {s]} y
   * x r@.s y → r (x s y) → r x s y
   * x r@:s y → x r
-  
 ```
 amp =:: [:[ ]: [:]
 ```

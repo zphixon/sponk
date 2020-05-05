@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub(crate) enum Tk {
+  Lp, Rp, // ( )
   La, Ra, Lb, Rb, I, // [ ] { } i
   Q, Qi, Qla, Qra, // :{ :i :[ :]
   Uqla, Uqra, // [: ]:
@@ -43,6 +44,9 @@ impl<'a> Sc<'a> {
       S(T::n(match self.a()? {
         b'\'' => self.st(),
 
+        b'(' => S(Tk::Lp),
+        b')' => S(Tk::Rp),
+
         b'[' if self.p() == b':' => { self.a()?; S(Tk::Uqla) },
         b'[' => S(Tk::La),
 
@@ -61,15 +65,15 @@ impl<'a> Sc<'a> {
           _ => N,
         }
 
-        b'=' => match self.p() {
-          b':' => {
-            self.a()?;
+        b'=' => match self.p() { // TODO: word =:, verb =::, adverb =:::, even higher order?
+          b':' => { self.a()?;
             match self.p() {
               b':' => { self.a()?; S(Tk::Aav) },
               _ => S(Tk::Av),
             }
           }
-          _ => S(Tk::Aw),
+          b'.' => { self.a()?; S(Tk::Aw) },
+          _ => S(Tk::I)
         }
 
         c if c.is_ascii_digit() => self.dg(),
@@ -253,5 +257,23 @@ mod t {
     assert_eq!(s.nt(), S(T::n(Tk::Uqla, "[:")));
     assert_eq!(s.nt(), S(T::n(Tk::Ra, "]")));
     assert_eq!(s.nt(), N);
+  }
+
+  #[test]
+  fn s11() {
+    let v: Vec<_> = Sc::n("x =. 1 2 3 4 5").map(|t| t.l).collect();
+    assert_eq!(v, vec!["x", "=.", "1", "2", "3", "4", "5"]);
+    let v: Vec<_> = Sc::n("y =. 6 7 8 9 10").map(|t| t.l).collect();
+    assert_eq!(v, vec!["y", "=.", "6", "7", "8", "9", "10"]);
+    let v: Vec<_> = Sc::n("x + y").map(|t| t.l).collect();
+    assert_eq!(v, vec!["x", "+", "y"]);
+    let v: Vec<_> = Sc::n("#$x").map(|t| t.l).collect();
+    assert_eq!(v, vec!["#", "$", "x"]);
+    let v: Vec<_> = Sc::n("{]+]}x").map(|t| t.l).collect();
+    assert_eq!(v, vec!["{", "]", "+", "]", "}", "x"]);
+    let v: Vec<_> = Sc::n("{1+]}(f 1 2 3 4 5)").map(|t| t.l).collect();
+    assert_eq!(v, vec!["{", "1", "+", "]", "}", "(", "f", "1", "2", "3", "4", "5", ")"]);
+    let v: Vec<_> = Sc::n("amp=::[:[ ]: [:]").map(|t| t.l).collect();
+    assert_eq!(v, vec!["amp", "=::", "[:", "[", "]:", "[:", "]"]);
   }
 }
