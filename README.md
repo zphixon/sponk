@@ -129,6 +129,7 @@ Function combinators
   * left and right arguments
 * errors
   * report early and often, especially syntax
+* able to browse the source code on github for mobile without scrolling horizontally
 
 ## syntax tree maybe
 
