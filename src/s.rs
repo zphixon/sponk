@@ -3,6 +3,8 @@
 
 type u = usize;
 type o<t> = Option<t>;
+use std::option::Option::Some as S;
+use std::option::Option::None as N;
 
 #[allow(dead_code)]
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -26,15 +28,15 @@ impl T<'_> {
   }
 }
 
-pub(crate) struct S<'a> {
+pub(crate) struct Sc<'a> {
   b: u,
   c: u,
   s: &'a [u8],
 }
 
-impl<'a> S<'a> {
-  pub(crate) fn n(s: &str) -> S<'_> {
-    S {
+impl<'a> Sc<'a> {
+  pub(crate) fn n(s: &str) -> Sc<'_> {
+    Sc {
       b: 0,
       c: 0,
       s: s.as_bytes()
@@ -43,8 +45,8 @@ impl<'a> S<'a> {
 
   pub(crate) fn nt(&mut self) -> o<T<'a>> {
     self.b = self.c;
-    if self.e() { None } else {
-      Some(T::n(match self.a() {
+    if self.e() { N } else {
+      S(T::n(match self.a() {
         b'[' if self.p() == b'.' => { self.a(); Tk::Lam }
         b'[' if self.p() == b':' => { self.a(); Tk::Lad }
         b'[' => Tk::La,
@@ -90,33 +92,33 @@ mod t {
   use super::*;
   #[test]
   fn s() {
-    let mut s = S::n("[[.].]");
-    assert_eq!(s.nt(), Some(T::n(Tk::La, "[")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Lam, "[.")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Ram, "].")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Ra, "]")));
-    assert_eq!(s.nt(), None);
-    assert_eq!(s.nt(), None);
-    assert_eq!(s.nt(), None);
-    assert_eq!(s.nt(), None);
-    assert_eq!(s.nt(), None);
+    let mut s = Sc::n("[[.].]");
+    assert_eq!(s.nt(), S(T::n(Tk::La, "[")));
+    assert_eq!(s.nt(), S(T::n(Tk::Lam, "[.")));
+    assert_eq!(s.nt(), S(T::n(Tk::Ram, "].")));
+    assert_eq!(s.nt(), S(T::n(Tk::Ra, "]")));
+    assert_eq!(s.nt(), N);
+    assert_eq!(s.nt(), N);
+    assert_eq!(s.nt(), N);
+    assert_eq!(s.nt(), N);
+    assert_eq!(s.nt(), N);
   }
 
   #[test]
   fn s2() {
-    let mut s = S::n("{}.{}].][.{]:}}{].");
-    assert_eq!(s.nt(), Some(T::n(Tk::B, "{")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Qbm, ".{")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Ram, "].")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Ra, "]")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Lam, "[.")));
-    assert_eq!(s.nt(), Some(T::n(Tk::B, "{")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Rad, "]:")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), Some(T::n(Tk::B, "{")));
-    assert_eq!(s.nt(), Some(T::n(Tk::Ram, "].")));
+    let mut s = Sc::n("{}.{}].][.{]:}}{].");
+    assert_eq!(s.nt(), S(T::n(Tk::B, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
+    assert_eq!(s.nt(), S(T::n(Tk::Qbm, ".{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
+    assert_eq!(s.nt(), S(T::n(Tk::Ram, "].")));
+    assert_eq!(s.nt(), S(T::n(Tk::Ra, "]")));
+    assert_eq!(s.nt(), S(T::n(Tk::Lam, "[.")));
+    assert_eq!(s.nt(), S(T::n(Tk::B, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Rad, "]:")));
+    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
+    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
+    assert_eq!(s.nt(), S(T::n(Tk::B, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Ram, "].")));
   }
 }
