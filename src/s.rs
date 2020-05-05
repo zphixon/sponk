@@ -1,10 +1,4 @@
-#![allow(non_snake_case)]
-#![allow(non_camel_case_types)]
-
-type u = usize;
-type O<t> = Option<t>;
-use std::option::Option::Some as S;
-use std::option::Option::None as N;
+use super::*;
 
 #[allow(dead_code)]
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -13,6 +7,7 @@ pub(crate) enum Tk {
   Q, Qi, Ql, Qr, // :{ :i :[ :]
   Uq, Uqi, Uqla, Uqra, // }: i: [: ]:
   Aw, Av, Aav, // =. =: :=:
+  L,
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -28,8 +23,8 @@ impl T<'_> {
 }
 
 pub(crate) struct Sc<'a> {
-  b: u,
-  c: u,
+  b: U,
+  c: U,
   s: &'a [u8],
 }
 

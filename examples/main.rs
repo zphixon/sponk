@@ -1,4 +1,5 @@
-mod s;
+
+extern crate sponk;
 
 fn main() {
   println!("sponk");
