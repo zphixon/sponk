@@ -146,7 +146,7 @@ how do we represent this in a sane way? adverbs, or higher-order functions.
   * x r@:s y → x r
   
 ```
-amp =: [:[ ]: [:]
+amp =:: [:[ ]: [:]
 ```
 
 ## goals
@@ -165,16 +165,24 @@ amp =: [:[ ]: [:]
 
 ## syntax tree maybe
 
-* `double =. ] + ]`
+* `double =: ] + ]`
   add the right argument to the right argument
   `(+ right right)`
-* `f =. [./ 2*]`
+* `f =: [./ 2*]`
   multiply 2 times the right argument, then spread the monadic left argument through that result
   `(/ left. (* 2 right))`
-* `avg =. (+/]) % #]`
+* `avg =: (+/]) % #]`
   spread + through the right argument, then find the length of the right argument, then divide
   `(% (/ + right) (# right))`
-* `l =. ([ avg&< ]) ~ ([,.])`
+* `l =: ([ avg&< ]) ~ ([,.])`
   average the right argument, then average the left argument, compare their results
   push the right argument to the left argument, pick
   `(~ (,. (left right)) (< (avg right) (avg left)))`
+
+two types of identifiers:
+* ascii punctuation: ``! " # $ % & ' ( ) * + , - . / ; < = > ? @ \ ^ _ ` | ~``
+  excluding `:`, `[`, `]`, `{`, `}`
+* ascii alphanumerics `[a-zA-Z][a-zA-Z0-9]`
+
+these are all valid:
+* `ding`, `d0ng`, `+.`, `-`

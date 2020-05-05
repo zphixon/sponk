@@ -4,8 +4,8 @@ use super::*;
 pub(crate) enum Tk {
   La, Ra, Lb, Rb, I, // [ ] { } i
   Q, Qi, Qla, Qra, // :{ :i :[ :]
-  Uq, Uqi, Uqla, Uqra, // }: i: [: ]:
-  Aw, Av, Aav, // =. =: :=:
+  Uqla, Uqra, // [: ]:
+  Aw, Av, Aav, // =. =: =::
   Dg, Str, // 3 'str'
 }
 
@@ -51,18 +51,30 @@ impl<'a> Sc<'a> {
 
         b'{' => S(Tk::Lb),
 
-        b'}' if self.p() == b':' => { self.a()?; S(Tk::Uq) },
         b'}' => S(Tk::Rb),
 
         b':' => match self.p() {
           b'[' => { self.a()?; S(Tk::Qla) },
           b']' => { self.a()?; S(Tk::Qra) },
           b'{' => { self.a()?; S(Tk::Q) },
-          _ => self.qi(),
+          c if c.is_ascii_alphanumeric() => self.qi(),
+          _ => N,
+        }
+
+        b'=' => match self.p() {
+          b':' => {
+            self.a()?;
+            match self.p() {
+              b':' => { self.a()?; S(Tk::Aav) },
+              _ => S(Tk::Av),
+            }
+          }
+          _ => S(Tk::Aw),
         }
 
         c if c.is_ascii_digit() => self.dg(),
         c if c.is_ascii_alphabetic() => self.id(),
+        c if c.is_ascii_punctuation() => self.op(),
         _ => N,
       }?, self.l()))
     }
@@ -80,15 +92,18 @@ impl<'a> Sc<'a> {
     else { self.a()?; S(Tk::Str) }
   }
 
+  fn op(&mut self) -> O<Tk> {
+    while self.p() == b'.' { self.a()?; }
+    S(Tk::I)
+  }
+
   fn qi(&mut self) -> O<Tk> {
-    while self.p().is_ascii_alphabetic() { self.a()?; }
-    Some(Tk::Qi)
+    self.id().map(|k| if k == Tk::I { S(Tk::Qi) } else { N })?
   }
 
   fn id(&mut self) -> O<Tk> {
-    while self.p().is_ascii_alphabetic() { self.a()?; }
-    if self.p() == b':' { self.a()?; Some(Tk::Uqi) }
-    else { Some(Tk::I) }
+    while self.p().is_ascii_alphanumeric() || self.p() == b'.' { self.a()?; }
+    Some(Tk::I)
   }
 
   fn dg(&mut self) -> O<Tk> {
@@ -122,6 +137,13 @@ impl<'a> Sc<'a> {
 
   fn l(&self) -> &'a str {
     std::str::from_utf8(&self.s[self.b..self.c]).unwrap()
+  }
+}
+
+impl<'a> Iterator for Sc<'a> {
+  type Item = T<'a>;
+  fn next(&mut self) -> Option<Self::Item> {
+    self.nt()
   }
 }
 
@@ -187,8 +209,8 @@ mod t {
 
   #[test]
   fn s6() {
-    let mut s = Sc::n("i::ii i 32.4:i");
-    assert_eq!(s.nt(), S(T::n(Tk::Uqi, "i:")));
+    let mut s = Sc::n("i:ii i 32.4:i");
+    assert_eq!(s.nt(), S(T::n(Tk::I, "i")));
     assert_eq!(s.nt(), S(T::n(Tk::Qi, ":ii")));
     assert_eq!(s.nt(), S(T::n(Tk::I, "i")));
     assert_eq!(s.nt(), S(T::n(Tk::Dg, "32.4")));
@@ -198,7 +220,6 @@ mod t {
 
   #[test]
   fn s7() {
-    // 'hello \' world'
     let mut s = Sc::n("  'hello \\' world'");
     assert_eq!(s.nt(), S(T::n(Tk::Str, "'hello \\' world'")));
     assert_eq!(s.nt(), N);
@@ -206,9 +227,31 @@ mod t {
 
   #[test]
   fn s8() {
-    let mut s = Sc::n("]}: [{ ]}[{'}:heiojewojoije' }{} {  }  {[}: }   :] [: :]}[]['hello '][ ]:{[}[:]   }[:{]:}  ");
+    let mut s = Sc::n("]} [{ ]}[{'}:heiojewojoije' }{} {  }  {[} }   :] [: :]}[]['hello '][ ]:{[}[:]   }[:{]:}  ");
     let mut i = 0;
     while s.nt().is_some() { i += 1; }
     assert_eq!(i, 39);
+  }
+
+  #[test]
+  fn s9() {
+    let mut s = Sc::n("{i3289:jeiwe328 38.3");
+    assert_eq!(s.nt(), S(T::n(Tk::Lb, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::I, "i3289")));
+    assert_eq!(s.nt(), S(T::n(Tk::Qi, ":jeiwe328")));
+    assert_eq!(s.nt(), S(T::n(Tk::Dg, "38.3")));
+  }
+
+  #[test]
+  fn s10() {
+    let mut s = Sc::n("amp=::[:[]:[:]");
+    assert_eq!(s.nt(), S(T::n(Tk::I, "amp")));
+    assert_eq!(s.nt(), S(T::n(Tk::Aav, "=::")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqla, "[:")));
+    assert_eq!(s.nt(), S(T::n(Tk::La, "[")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqra, "]:")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqla, "[:")));
+    assert_eq!(s.nt(), S(T::n(Tk::Ra, "]")));
+    assert_eq!(s.nt(), N);
   }
 }

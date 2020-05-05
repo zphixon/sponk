@@ -9,4 +9,7 @@ use std::option::Option::Some as S;
 use std::option::Option::None as N;
 
 mod a;
+mod p;
 mod s;
+
+use s::*;
