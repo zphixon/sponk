@@ -2,18 +2,17 @@
 #![allow(non_camel_case_types)]
 
 type u = usize;
-type o<t> = Option<t>;
+type O<t> = Option<t>;
 use std::option::Option::Some as S;
 use std::option::Option::None as N;
 
 #[allow(dead_code)]
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub(crate) enum Tk {
-  La, Lam, Lad, Ra, Ram, Rad,
-  B, Bc,
-  Qim, Qbm, Qid, Qbd,
-  I, Im, Id,
-  E, Em, Ed,
+  La, Ra, Lb, Rb, // [ ] { }
+  Q, Qi, Ql, Qr, // :{ :i :[ :]
+  Uq, Uqi, Uqla, Uqra, // }: i: [: ]:
+  Aw, Av, Aav, // =. =: :=:
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -43,30 +42,35 @@ impl<'a> Sc<'a> {
     }
   }
 
-  pub(crate) fn nt(&mut self) -> o<T<'a>> {
+  pub(crate) fn nt(&mut self) -> O<T<'a>> {
     self.b = self.c;
     if self.e() { N } else {
+      self.sws();
       S(T::n(match self.a() {
-        b'[' if self.p() == b'.' => { self.a(); Tk::Lam }
-        b'[' if self.p() == b':' => { self.a(); Tk::Lad }
+        b'[' if self.p() == b':' => { self.a(); Tk::Uqla },
         b'[' => Tk::La,
-        b']' if self.p() == b'.' => { self.a(); Tk::Ram }
-        b']' if self.p() == b':' => { self.a(); Tk::Rad }
+
+        b']' if self.p() == b':' => { self.a(); Tk::Uqra },
         b']' => Tk::Ra,
 
-        b'{' => Tk::B,
-        b'}' => Tk::Bc,
-        b'.' => match self.p() {
-          b'{' => { self.a(); Tk::Qbm },
-          _ => todo!("Tk::Qim")
-        }
+        b'{' => Tk::Lb,
+
+        b'}' if self.p() == b':' => { self.a(); Tk::Uq },
+        b'}' => Tk::Rb,
+
         b':' => match self.p() {
-          b'{' => { self.a(); Tk::Qbd },
-          _ => todo!("Tk::Qid")
+          b'[' => { self.a(); Tk::Ql },
+          b']' => { self.a(); Tk::Qr },
+          b'{' => { self.a(); Tk::Q },
+          _ => todo!("Tk::Qi")
         }
-        c => panic!("s {}", c as char)
+        _ => todo!("Tk::Uqi, Tk::I")
       }, self.l()))
     }
+  }
+
+  fn sws(&mut self) {
+    while self.p().is_ascii_whitespace() { self.a(); }
   }
 
   fn e(&self) -> bool {
@@ -92,10 +96,10 @@ mod t {
   use super::*;
   #[test]
   fn s() {
-    let mut s = Sc::n("[[.].]");
+    let mut s = Sc::n("[[:]:]");
     assert_eq!(s.nt(), S(T::n(Tk::La, "[")));
-    assert_eq!(s.nt(), S(T::n(Tk::Lam, "[.")));
-    assert_eq!(s.nt(), S(T::n(Tk::Ram, "].")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqla, "[:")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqra, "]:")));
     assert_eq!(s.nt(), S(T::n(Tk::Ra, "]")));
     assert_eq!(s.nt(), N);
     assert_eq!(s.nt(), N);
@@ -106,19 +110,19 @@ mod t {
 
   #[test]
   fn s2() {
-    let mut s = Sc::n("{}.{}].][.{]:}}{].");
-    assert_eq!(s.nt(), S(T::n(Tk::B, "{")));
-    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), S(T::n(Tk::Qbm, ".{")));
-    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), S(T::n(Tk::Ram, "].")));
+    let mut s = Sc::n("{}:{}]:][:{]:}}{]:");
+    assert_eq!(s.nt(), S(T::n(Tk::Lb, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uq, "}:")));
+    assert_eq!(s.nt(), S(T::n(Tk::Lb, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Rb, "}")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqra, "]:")));
     assert_eq!(s.nt(), S(T::n(Tk::Ra, "]")));
-    assert_eq!(s.nt(), S(T::n(Tk::Lam, "[.")));
-    assert_eq!(s.nt(), S(T::n(Tk::B, "{")));
-    assert_eq!(s.nt(), S(T::n(Tk::Rad, "]:")));
-    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), S(T::n(Tk::Bc, "}")));
-    assert_eq!(s.nt(), S(T::n(Tk::B, "{")));
-    assert_eq!(s.nt(), S(T::n(Tk::Ram, "].")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqla, "[:")));
+    assert_eq!(s.nt(), S(T::n(Tk::Lb, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqra, "]:")));
+    assert_eq!(s.nt(), S(T::n(Tk::Rb, "}")));
+    assert_eq!(s.nt(), S(T::n(Tk::Rb, "}")));
+    assert_eq!(s.nt(), S(T::n(Tk::Lb, "{")));
+    assert_eq!(s.nt(), S(T::n(Tk::Uqra, "]:")));
   }
 }

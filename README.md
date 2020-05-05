@@ -10,8 +10,8 @@ Sponk mostly follows the same philosophy of J, except it has a slightly more san
 Sponk operates on n-dimensional arrays.
 
 ```
-    x = 1 2 3 4 5
-    y = 6 7 8 9 10
+    x =. 1 2 3 4 5
+    y =. 6 7 8 9 10
     x + y
 7 9 11 13 15
 
@@ -26,9 +26,9 @@ You can manipulate arrays with several operators.
 
 ```
     -- list manipulation
-    x = 1 2 3 4 5
-    y = 6 7 8 9 10
-    z = 11 12 13 14 15
+    x =. 1 2 3 4 5
+    y =. 6 7 8 9 10
+    z =. 11 12 13 14 15
 
     -- append
     x,y,z
@@ -45,7 +45,7 @@ You can manipulate arrays with several operators.
 11 12 13 14 15
 
     -- shape, length, rank of arrays
-    a = x,.y,.z
+    a =. x,.y,.z
     # a -- a has three elements
 3
     $ a -- a is a 3x5 array
@@ -54,50 +54,50 @@ You can manipulate arrays with several operators.
 2
 ```
 
-Lambdas/anonymous functions/dfns
+### Functions and dfn's (verbs and dvns?)
 
 ```
-    x = 32
+    x =. 32
 
     {] + ]} x
 64
 
-    double =. ] + ]
-    def. double
-.{]+]}
+    double =: ] + ]
+    :double
+:{]+]}
 
     double x
 64
 
-    avg =. +/] % #]
-    def. avg
-.{+/]%#]}
+    avg =: +/] % #]
+    :avg
+:{+/]%#]}
 
     avg 42 8 15 4 16 23
 18
 
-    l =: (avg[ < avg]) ~ ([,.])
-    def. l
+    l =: ((avg[) < (avg])) ~ ([,.])
+    :l
 :{(avg[<avg])~([,.])}
 
-    x = 1 2 3 4 5
-    y = 6 7 8 9 10
+    x =. 1 2 3 4 5
+    y =. 6 7 8 9 10
     x l y
 6 7 8 9 10
 ```
 
-Documentation
+### Documentation
 
 ```
-    db =. ] + ]
-    :db doc: 'Doubles the right argument.'
+    db =: ] + ]
+    :db doc. 'Doubles the right argument.'
 
     help. db
 Doubles the right argument.
-db =. ] + ]
+db =: ] + ]
 ```
 
-Quotes
+### Quotes
 
 ```
     -- f expects its left argument to be a monadic function
@@ -111,11 +111,43 @@ but f has no monadic form
     f=:[./2*]
 
     -- so you need to quote the dfn in order to pass it to f
-    .{1+]} f 1 2 3 4 5
+    :{1+]} f 1 2 3 4 5
 3 5 7 9 11
 ```
 
-Function combinators
+### Function combinators
+
+r, s are verbs, and x, y are nouns, not with any particular value, just
+representing left and right arguments
+
+* one verb
+  * `{r]} y` ← `r y`
+  * `x{[r]}y` ← `x r y`
+* two verbs
+  * `r s`
+    * `{r]}{s]}y` ← `r (s y)`
+    * `{r]}x{[s]}y` ← `r (x s y)`
+    * `x{[r]}{s]}y` ← `x r (s y)`
+    * `x{[r]}x{[s]}y` ← `x r (x s y)`
+  * `s r s`
+    * `({s]}y) r {s]y}` ← `(s y) r (s y)`
+    * `({s]}y) r x{[s]}y` ← `(s y) r (x s y)`
+    * `(x{[s]}y) r {s]}y` ← `(x s y) r (s y)`
+    * `(x{[s]}y) r x{[s]}y` ← `(x s y) r (x s y)`
+  * `r s r` swap r and s above
+
+how do we represent this in a sane way? adverbs, or higher-order functions.
+→
+`@`, compose
+* `r@s`
+  * r@s y → r (s y) → r {s]} y
+  * x r@s y → x r (s y) → x r {s]} y
+  * x r@.s y → r (x s y) → r x s y
+  * x r@:s y → x r
+  
+```
+amp =: [:[ ]: [:]
+```
 
 ## goals
 
@@ -136,13 +168,13 @@ Function combinators
 * `double =. ] + ]`
   add the right argument to the right argument
   `(+ right right)`
-* `f =: [./ 2*]`
+* `f =. [./ 2*]`
   multiply 2 times the right argument, then spread the monadic left argument through that result
   `(/ left. (* 2 right))`
 * `avg =. (+/]) % #]`
   spread + through the right argument, then find the length of the right argument, then divide
   `(% (/ + right) (# right))`
-* `l =: ([ avg&< ]) ~ ([,.])`
+* `l =. ([ avg&< ]) ~ ([,.])`
   average the right argument, then average the left argument, compare their results
   push the right argument to the left argument, pick
   `(~ (,. (left right)) (< (avg right) (avg left)))`
