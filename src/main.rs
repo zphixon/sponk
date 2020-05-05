@@ -1,5 +1,6 @@
+mod s;
 
 fn main() {
-    println!("Hello, world!");
+  println!("sponk");
 }
 
