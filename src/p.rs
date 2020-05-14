@@ -1,3 +1,5 @@
+//! parser
+
 use super::*;
 
 pub(crate) struct St {
