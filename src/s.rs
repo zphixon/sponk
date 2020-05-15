@@ -5,21 +5,41 @@ use super::*;
 /// token kind
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub(crate) enum Tk {
-  Lp, Rp, // ( )
-  La, Ra, Lb, Rb, I, // [ ] { } i
-  Co, // :
-  Dg, Str, // 3 'str'
-  E, // eof
+  /// left paren
+  Lp,
+  /// right paren
+  Rp,
+  /// left arg
+  La,
+  /// right arg
+  Ra,
+  /// left brace
+  Lb,
+  /// right brace
+  Rb,
+  /// identifier
+  I,
+  /// colon
+  Co,
+  /// number
+  Dg,
+  /// string
+  Str,
+  /// eof
+  E,
 }
 
 /// token
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub(crate) struct T<'a> {
+  /// kind
   k: Tk,
+  /// lexeme
   l: &'a str,
 }
 
 impl T<'_> {
+  /// new
   pub(crate) fn n(k: Tk, l: &str) -> T<'_> {
     T { k, l }
   }
@@ -28,12 +48,16 @@ impl T<'_> {
 /// scanner
 #[derive(Debug)]
 pub(crate) struct Sc<'a> {
+  /// beginning
   b: U,
+  /// current
   c: U,
+  /// source
   s: &'a [u8],
 }
 
 impl<'a> Sc<'a> {
+  /// new
   pub(crate) fn n(s: &str) -> Sc<'_> {
     Sc {
       b: 0,
@@ -42,6 +66,7 @@ impl<'a> Sc<'a> {
     }
   }
 
+  /// next token
   pub(crate) fn nt(&mut self) -> R<T<'a>> {
     if self.e() { Ok(T::n(Tk::E, "")) } else {
       self.sws();
@@ -64,10 +89,10 @@ impl<'a> Sc<'a> {
         b'=' => match self.p() {
           b':' => { self.a(); match self.p() {
             b':' => { self.a(); match self.p() {
-              b':' => { self.a(); Ok(Tk::I) }
-              _ => Ok(Tk::I) } }
-            _ => Ok(Tk::I) } }
-          _ => Ok(Tk::I)
+              b':' => { self.a(); Ok(Tk::I) } // adverb
+              _ => Ok(Tk::I) } } // verb
+            _ => Ok(Tk::I) } } // noun
+          _ => Ok(Tk::I) // etc
         }
 
         c if c.is_ascii_digit() => self.dg(),
@@ -78,28 +103,33 @@ impl<'a> Sc<'a> {
     }
   }
 
+  /// string
   fn st(&mut self) -> R<Tk> {
     while !self.e() && self.p() != b'\'' {
       if self.p() == b'\\' {
         self.a();
-        if self.p() != b'\'' { return Err(E::UnknownEscapeCode) }
+        if self.p() != b'\'' { return Err(E::Uec) }
       }
       self.a();
     }
-    if self.e() { Err(E::UnterminatedString) }
+    if self.e() { Err(E::Us) }
     else { self.a(); Ok(Tk::Str) }
   }
 
+  /// builtin op
   fn op(&mut self) -> Tk {
     while self.p() == b'.' { self.a(); }
     Tk::I
   }
 
+  /// identifier
   fn id(&mut self) -> Tk {
-    while self.p().is_ascii_alphanumeric() || self.p() == b'.' { self.a(); }
+    while self.p().is_ascii_alphanumeric()
+      || self.p() == b'.' { self.a(); }
     Tk::I
   }
 
+  /// number
   fn dg(&mut self) -> R<Tk> {
     while self.p().is_ascii_digit() { self.a(); }
     if self.p() == b'.' {
@@ -112,23 +142,28 @@ impl<'a> Sc<'a> {
     Ok(Tk::Dg)
   }
 
+  /// slurp whitespace
   fn sws(&mut self) {
     while self.p().is_ascii_whitespace() { self.a(); }
   }
 
+  /// at end
   fn e(&self) -> bool {
     self.c >= self.s.len()
   }
 
+  /// advance
   fn a(&mut self) -> u8 {
     self.c += 1;
     self.s.get(self.c-1).map(|u| *u).unwrap_or(b'\0')
   }
 
+  /// peek
   fn p(&mut self) -> u8 {
     if self.e() { b'\0' } else { self.s[self.c] }
   }
 
+  /// lexeme
   fn l(&self) -> R<&'a str> {
     Ok(std::str::from_utf8(&self.s[self.b..self.c])?)
   }
