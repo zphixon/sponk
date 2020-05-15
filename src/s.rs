@@ -155,7 +155,7 @@ impl<'a> Sc<'a> {
   /// advance
   fn a(&mut self) -> u8 {
     self.c += 1;
-    self.s.get(self.c-1).map(|u| *u).unwrap_or(b'\0')
+    self.s.get(self.c-1).copied().unwrap_or(b'\0')
   }
 
   /// peek
