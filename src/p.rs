@@ -2,11 +2,12 @@
 
 use super::*;
 
-pub(crate) struct St {
-
+/// syntax tree
+pub(crate) enum St<'a> {
+  Dvn(Vec<T<'a>>),
 }
 
-pub(crate) fn p() -> O<St> {
+pub(crate) fn p() -> O<St<'static>> {
   N
 }
 
