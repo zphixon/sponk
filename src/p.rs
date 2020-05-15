@@ -4,6 +4,7 @@ use super::*;
 
 /// syntax tree
 pub(crate) enum St<'a> {
+  /// anon function
   Dvn(Vec<T<'a>>),
 }
 
