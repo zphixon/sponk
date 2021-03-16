@@ -10,8 +10,8 @@ Sponk mostly follows the same philosophy of J, except it has a slightly more san
 Sponk operates on n-dimensional arrays.
 
 ```
-    x =. 1 2 3 4 5
-    y =. 6 7 8 9 10
+    x = 1 2 3 4 5
+    y = 6 7 8 9 10
     x + y
 7 9 11 13 15
 
@@ -26,9 +26,9 @@ You can manipulate arrays with several operators.
 
 ```
     -- list manipulation
-    x =. 1 2 3 4 5
-    y =. 6 7 8 9 10
-    z =. 11 12 13 14 15
+    x = 1 2 3 4 5
+    y = 6 7 8 9 10
+    z = 11 12 13 14 15
 
     -- append
     x,y,z
@@ -45,7 +45,7 @@ You can manipulate arrays with several operators.
 11 12 13 14 15
 
     -- shape, length, rank of arrays
-    a =. x,.y,.z
+    a = x,.y,.z
     # a -- a has three elements
 3
     $ a -- a is a 3x5 array
@@ -57,31 +57,32 @@ You can manipulate arrays with several operators.
 ### Functions and dfn's (verbs and dvns?)
 
 ```
-    x =. 32
+    x = 32
 
     {] + ]} x
 64
 
-    double =: ] + ]
+    -- := -> quote the expression
+    double := ] + ]
     :double
 :{]+]}
 
     double x
 64
 
-    avg =: +/] % #]
+    avg := +/] % #]
     :avg
 :{+/]%#]}
 
     avg 42 8 15 4 16 23
 18
 
-    l =: ((avg[) < (avg])) ~ ([,.])
+    l := ((avg[) < (avg])) ~ ([,.])
     :l
 :{(avg[<avg])~([,.])}
 
-    x =. 1 2 3 4 5
-    y =. 6 7 8 9 10
+    x = 1 2 3 4 5
+    y = 6 7 8 9 10
     x l y
 6 7 8 9 10
 ```
@@ -89,12 +90,12 @@ You can manipulate arrays with several operators.
 ### Documentation
 
 ```
-    db =: ] + ]
-    :db doc. 'Doubles the right argument.'
+    db := ] + ]
+    :db doc 'Doubles the right argument.'
 
-    help. db
+    help db
 Doubles the right argument.
-db =: ] + ]
+db := ] + ]
 ```
 
 ### Quotes
@@ -103,14 +104,14 @@ multiple levels of quoting/unquoting in verb definitions?
 
 ```
     -- f expects its left argument to be a monadic function
-    f =: [./ 2*]
+    f := [/ 2*]
 
     -- but this snippet doesn't really make sense
     {1+]} f 1 2 3 4 5
 error: the expression is parsed as
     {1+]} (f 1 2 3 4 5)
 but f has no monadic form
-    f=:[./2*]
+    f:=[./2*]
 
     -- so you need to quote the dfn in order to pass it to f
     :{1+]} f 1 2 3 4 5
@@ -145,9 +146,10 @@ how do we represent this in a sane way? adverbs, or higher-order functions.
   * r@s y → r (s y) → r {s]} y
   * x r@s y → x r (s y) → x r {s]} y
   * x r@.s y → r (x s y) → r x s y
-  * x r@:s y → x r
+  * x r@..s y → x r
 ```
-amp =:: [:[ ]: [:]
+amp := [:[ ]: [:]
+ampdot
 ```
 
 ## goals
@@ -166,18 +168,18 @@ amp =:: [:[ ]: [:]
 
 ## syntax tree maybe
 
-* `double =: ] + ]`
+* `double := ] + ]`
   add the right argument to the right argument
   `(+ right right)`
-* `f =: [./ 2*]`
-  multiply 2 times the right argument, then spread the monadic left argument through that result
-  `(/ left. (* 2 right))`
-* `avg =: (+/]) % #]`
+* `f := [/ 2*]`
+  multiply 2 times the right argument, then spread the left argument through that result
+  `(/ left (* 2 right))`
+* `avg := (+/]) % #]`
   spread + through the right argument, then find the length of the right argument, then divide
   `(% (/ + right) (# right))`
-* `l =: ([ avg&< ]) ~ ([,.])`
-  average the right argument, then average the left argument, compare their results
-  push the right argument to the left argument, pick
+* `l := ([ avg&< ]) ~ ([,.])`
+  average the right argument, then average the left argument, compare their results.
+  push the right argument to the left argument, pick.
   `(~ (,. (left right)) (< (avg right) (avg left)))`
 
 two types of identifiers:

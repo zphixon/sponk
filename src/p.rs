@@ -19,7 +19,7 @@ mod t {
   fn p() {
     let mut s = Sc::n("x+y");
     let v: Vec<_> = s.collect();
-    assert_eq!(v, vec![T::n(Tk::I, "x"), T::n(Tk::I, "+"), T::n(Tk::I, "y")]);
+    assert_eq!(v, vec![T::n(Tk::I(0), "x"), T::n(Tk::I(0), "+"), T::n(Tk::I(0), "y")]);
   }
 }
 
