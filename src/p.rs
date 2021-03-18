@@ -88,20 +88,20 @@ mod t {
   fn p() {
     let mut s = Sc::n("x+y");
     let v: Vec<_> = s.collect();
-    assert_eq!(v, vec![T::n(Tk::I(0), "x"), T::n(Tk::I(0), "+"), T::n(Tk::I(0), "y")]);
+    assert_eq!(v, vec![T::n(Tk::I, "x"), T::n(Tk::I, "+"), T::n(Tk::I, "y")]);
   }
 
   #[test]
   fn p2() {
     let src = "a = 1 + 2";
     let a = St::As {
-      n: T::n(Tk::I(0), "a"),
+      n: T::n(Tk::I, "a"),
       e: Ex::D {
         rhs: Box::new(Ex::L {
           v: vec![T::n(Tk::Dg, "1")],
         }),
         op: Box::new(Ex::I {
-          n: T::n(Tk::I(0), "+")
+          n: T::n(Tk::I, "+")
         }),
         lhs: Box::new(Ex::L {
           v: vec![T::n(Tk::Dg, "2")]

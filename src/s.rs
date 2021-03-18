@@ -2,6 +2,11 @@
 
 use super::*;
 
+/// is user/builtin identifier
+fn id(c: u8) -> bool {
+  !c.is_ascii_punctuation() && !c.is_ascii_whitespace()
+}
+
 /// token kind
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub(crate) enum Tk {
@@ -18,7 +23,7 @@ pub(crate) enum Tk {
   /// right brace
   Rb,
   /// identifier
-  I(U),
+  I,
   /// colon equal
   Coeq,
   /// equal
@@ -96,9 +101,8 @@ impl<'a> Sc<'a> {
         b'}' => Ok(Tk::Rb),
 
         c if c.is_ascii_digit() => self.dg(),
-        c if c.is_ascii_alphabetic() => Ok(self.id()),
         c if c.is_ascii_punctuation() => Ok(self.op()),
-        c => { dbg!(self); dbg!(c); unreachable!() },
+        _ => Ok(self.id()),
       }?, self.l()?))
     }
   }
@@ -118,17 +122,15 @@ impl<'a> Sc<'a> {
 
   /// builtin op
   fn op(&mut self) -> Tk {
-    let mut v = 0;
-    while self.p() == b'.' { self.a(); v += 1; }
-    Tk::I(v)
+    while self.p() == b'.' { self.a(); }
+    Tk::I
   }
 
   /// identifier
   fn id(&mut self) -> Tk {
-    while self.p().is_ascii_alphanumeric() { self.a(); }
-    let mut v = 0;
-    while self.p() == b'.' { self.a(); v += 1; }
-    Tk::I(v)
+    while id(self.p()) && !self.e() { self.a(); }
+    while self.p() == b'.' { self.a(); }
+    Tk::I
   }
 
   /// number
@@ -251,13 +253,13 @@ mod t {
   #[test]
   fn s6() {
     let mut s = Sc::n("i:ii i 32.4:i");
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(0), "i")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "i")));
     assert_eq!(s.nt(), Ok(T::n(Tk::Co, ":")));
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(0), "ii")));
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(0), "i")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "ii")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "i")));
     assert_eq!(s.nt(), Ok(T::n(Tk::Dg, "32.4")));
     assert_eq!(s.nt(), Ok(T::n(Tk::Co, ":")));
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(0), "i")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "i")));
     assert_eq!(s.nt(), Ok(T::n(Tk::E, "")));
   }
 
@@ -280,9 +282,9 @@ mod t {
   fn s9() {
     let mut s = Sc::n("{i3289:jeiwe328 38.3");
     assert_eq!(s.nt(), Ok(T::n(Tk::Lb, "{")));
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(0), "i3289")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "i3289")));
     assert_eq!(s.nt(), Ok(T::n(Tk::Co, ":")));
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(0), "jeiwe328")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "jeiwe328")));
     assert_eq!(s.nt(), Ok(T::n(Tk::Dg, "38.3")));
     assert_eq!(s.nt(), Ok(T::n(Tk::E, "")));
   }
@@ -290,7 +292,7 @@ mod t {
   #[test]
   fn s10() {
     let mut s = Sc::n("amp:=[:[]:[:]");
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(0), "amp")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "amp")));
     assert_eq!(s.nt(), Ok(T::n(Tk::Coeq, ":=")));
     assert_eq!(s.nt(), Ok(T::n(Tk::La, "[")));
     assert_eq!(s.nt(), Ok(T::n(Tk::Co, ":")));
@@ -330,8 +332,14 @@ mod t {
   #[test]
   fn s13() {
     let mut s = Sc::n("+.. -. x....");
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(2), "+..")));
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(1), "-.")));
-    assert_eq!(s.nt(), Ok(T::n(Tk::I(4), "x....")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "+..")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "-.")));
+    assert_eq!(s.nt(), Ok(T::n(Tk::I, "x....")));
+  }
+
+  #[test]
+  fn s14() {
+    let v: Vec<_> = Sc::n("x+y").map(|t| t.l).collect();
+    assert_eq!(v, vec!["x", "+", "y"]);
   }
 }
