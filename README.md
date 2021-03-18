@@ -29,7 +29,7 @@ Sponk operates on n-dimensional arrays.
 5
     $ x
 5
-    # $ x
+    # ($ x)
 1
 ```
 
@@ -87,7 +87,7 @@ You can manipulate arrays with several operators.
 ### Quotes are functions
 
 ```
-    x =. 32
+    x = 32
 
     -- quote the expression
     {x + x}
@@ -187,7 +187,7 @@ db =. ]+]
     +/ 1 2 3 4 5
 
     -- spread left argument through 2* right argument
-    f =. [/ 2*]
+    f =. [/ (2*])
 
     {1+]} f 1 2 3 4 5
 ╭ not a dyad
@@ -200,67 +200,34 @@ db =. ]+]
 34
 
     -- spread + through right argument, divide by length of right argument
-    avg =. +/] % #]
+    avg =. (+/]) % (#])
     avg 42 8 15 4 16 23
 18
 
     -- choose the array with the larger average
-    largest =. (avg[ < avg]) ~ ([,.])
+    largest =. ([ <&avg ]) ~ ([,.])
 
     x = 1 2 3 4 5
     y = 1 1 1 1 80
-    x l y
+    x largest y
 1 1 1 1 80
 ```
 
-### Combinators
+### "Combinators"
 
-As a little thought experiment, consider the following table. `r`, `s` are
-quotes, and `x`, `y` are values.
+Unlike J, functions will always be surrounded by their arguments. The implicit
+"hook" and "fork" constructs are made explicit in Sponk. Using the parenthesized
+versions will expand the functions every time they are referenced, but the
+combinator versions will not.
 
-| Expression      | With parentheses    | Traditionally written | Equivalent to
-| --------------- | ------------------- | --------------------- | ---
-| `r y`           | `r y`               | `r(y)`                |
-| `x r y`         | `x r y`             | `r(x, y)`             |
-| `r s y`         | `r (s y)`           | `r(s(y))`             |
-| `x r s y`       | `x r (s y)`         | `r(x, s(y))`          |
-| `r x s y`       | `r (x s y)`         | `r(s(x, y))`          |
-| `s y r s y`     | `(s y) r (s y)`     | `r(s(y), s(y))`       | `r@s y`
-| `s y r x s y`   | `(s y) r (x s y)`   | `r(s(y), s(x, y))`    |
-| `x s y r s y`   | `(x s y) r (s y)`   | `r(s(x, y), s(y))`    |
-| `x s y r x s y` | `(x s y) r (x s y)` | `r(s(x, y), s(x, y))` |
-
-<!-- WOW LOOK AT THEM LINE ENDINGS -->
-
-The first three expressions are fully readable without knowledge of the bindings
-of any of these names, but what about the rest? We need combinators in order for
-humans to be able to differentiate these expressions from lists, and so we don't
-end up evaluating `x` and `y` multiple times. We'll name the quotes conjoined by
-a combinator `t`.
-
-| Expression  | As above        | AKA             | Looks like |
-| ----------- | --------------- | --------------- | ---------- |
-| `r@s y`     | `(s y) r (s y)` | `r(s(y), s(y))` | `t y`      |
-| `x r@s y`   | `(s x) r (s y)` | `r(s(x), s(y))` | `x t y`    |
-
-You could even implement a version of `@` yourself if you wanted using `[.` and
-`[.`, although the builtin uses some magic to make it nicer:
-
-```
-    x = 1
-    y = 2
-    r =. [ + 3 + ]
-    s =. 2* ]
-
-    amp =. [. [ ] ].
-
-    x r (s y)
-5
-    x r@s y
-5
-    x {r amp s} y
-5
-```
+| Combinator  | Expression  | Equivalent to   |
+| ----------- | ----------- | --------------- |
+| `&`         | `r&s y`     | `r (s y)`       |
+|             | `x r&s y`   | `(s x) r (s y)` |
+| `&.`        | `r&.s y`    | `y r (s y)`     |
+|             | `x r&.s y`  | `x r (s y)`     |
+| `@`         | `r@s y`     | `r (s y)`       |
+|             | `x r@s y`   | `r (x s y)`     |
 
 ## goals
 
@@ -289,15 +256,15 @@ You could even implement a version of `@` yourself if you wanted using `[.` and
   spread + through the right argument, then find the length of the right
   argument, then divide
   `(% (/ + right) (# right))`
-* `l =. ([ avg&< ]) ~ ([,.])`
+* `l =. ([ &<avg ]) ~ ([,.])`
   average the right argument, then average the left argument, compare their
   results. push the right argument to the left argument, pick.
   `(~ (,. (left right)) (< (avg right) (avg left)))`
 
-two types of identifiers:
-* ascii punctuation: ``! " # $ % & ' ( ) * + , - . / ; < = > ? @ \ ^ _ ` | ~``
-  excluding `:`, `[`, `]`, `{`, `}`
-* ascii alphanumerics `[a-zA-Z][a-zA-Z0-9]`
+identifiers are are ascii alphanumeric or ascii punctuation
+* excluding `:`, `[`, `]`, `{`, `}`
+* user-defined `[a-z][a-zA-Z0-9]*\.*`
+* built-in `[A-Z][a-zA-Z0-9]*\.*`
 
 these are all valid:
 * `ding`, `d0ng`, `+.`, `-`
@@ -316,16 +283,40 @@ these are all valid:
 
 ## execution model
 
-* name resolution → tree building → quote expansion → evaluation
+* name resolution → logic tree building → quote expansion → evaluation
 * quotes are simple substitution
   * for example
     ```
     double =. 2*]     -- define a function
     double  3         -- use it
-    {2 * ]} 3         -- name -> {}
+    {2 * ]} 3         -- expand name -> {}
     {2 * 3} :         -- ] -> arg, arg -> :
      2 * 3            -- evaluate
      6                -- evaluate
+    ```
+  * more (this is actually wrong cause it's evaluating `y` before the full quote
+    is expanded but whatever you get the point the quote expands and everything
+    is evaluated from there)
+    ```
+    avg =. (+/]) % (#])
+    largest =. ([ <&avg ]) ~ ([,.])
+
+    x = 1 2 3 4 5
+    y = 1 1 1 1 80
+    x largest y
+    x { (                                  [  <&avg                                 ]   ~ ([         ,. ]         ) } y
+    x { ((avg                              [) < (avg                                ])) ~ ([         ,. ]         ) } y
+    x { (({(+/ ]                ) % (# ])} [) < ({(+/ ]         ) % (# ]         )} ])) ~ ([         ,. ]         ) } y
+    : { (({(+/ ]        ) % (# ]        )} x) < ({(+/ ]         ) % (# ]         )} y)) ~ (x         ,. y         ) } :
+    : { (({(+/ x        ) % (# x        )} :) < ({(+/ y         ) % (# y         )} :)) ~ (x         ,. y         ) } :
+        (({(+/ x        ) % (# x        )} :) < ({(+/ y         ) % (# y         )} :)) ~ (1 2 3 4 5 ,. 1 1 1 1 80)
+        (({(+/ x        ) % (# x        )} :) < ( (+/ 1 1 1 1 80) % (# 1 1 1 1 80)   )) ~  1 2 3 4 5 \n 1 1 1 1 80
+        (({(+/ x        ) % (# x        )} :) < ( (84           ) % (5           )   )) ~  1 2 3 4 5 \n 1 1 1 1 80
+        (( (+/ 1 2 3 4 5) % (# 1 2 3 4 5)   ) < ( (84           ) % (5           )   )) ~  1 2 3 4 5 \n 1 1 1 1 80
+        (( (15          ) % (5          )   ) < ( (84           ) % (5           )   )) ~  1 2 3 4 5 \n 1 1 1 1 80
+        ((                3                 ) < (                 16.8               )) ~  1 2 3 4 5 \n 1 1 1 1 80
+        (                                     1                                       ) ~  1 2 3 4 5 \n 1 1 1 1 80
+                                                                                        1 1 1 1 80
     ```
 * parsing uses a symbol table to look up definitions to determine what syntax
   is being constructed. it is known at parse time what each name refers to, so
