@@ -3,16 +3,20 @@
 
 (eventually) A very small array-oriented language.
 
-Sponk mostly follows the same philosophy of J, except it has a slightly more
-sane syntax.
+Sponk mostly follows the same philosophy of J, except it has a slightly more sane syntax. Also with APL symbols because
+I love the shit out of them.
 
 ## todo
 * [ ] specification
 * [ ] parser
 * [ ] interpreter
 * [ ] compiler to shader language????
+* [ ] row polymorphism??
 
 ## lil ideas
+
+if ⍴⍴array > 2 you can name the ranks??? that sounds super dope, and select ranks like ⌽⍉⊖ with those names instead of
+ridiculous [rank] syntax
 
 Sponk operates on n-dimensional arrays.
 
@@ -136,9 +140,8 @@ You can manipulate arrays with several operators.
 
 ### Arguments
 
-`[` and `]` refer to the left and right arguments of the quote they're inside.
-You can use `[.` and `].` to refer to arguments of outer quotes, and even
-further up with more `.`.
+`[` and `]` refer to the left and right arguments of the quote they're inside. You can use `[.` and `].` to refer to
+arguments of outer quotes, and even further up with more `.`.
 
 ### Documentation, aliases for built-in quotes
 
@@ -215,9 +218,8 @@ db =. ]+]
 
 ### "Combinators"
 
-Unlike J, functions will always be surrounded by their arguments. The implicit
-"hook" and "fork" constructs are made explicit in Sponk. Using the parenthesized
-versions will expand the functions every time they are referenced, but the
+Unlike J, functions will always be surrounded by their arguments. The implicit "hook" and "fork" constructs are made
+explicit in Sponk. Using the parenthesized versions will expand the functions every time they are referenced, but the
 combinator versions will not.
 
 | Combinator  | Expression  | Equivalent to   |
@@ -272,13 +274,11 @@ these are all valid:
 ## more rigid definitions/thoughts
 
 ### definitions
-* quote: `{}` a sponk program fragment, can contain references to bindings
-  outside itself, lazily evaluated
+* quote: `{}` a sponk program fragment, can contain references to bindings outside itself, lazily evaluated
 * atom: a literal, a number, a string, an array, a value
 * function: a quote with arguments `[` `]`
-* combinator: in a loose sense, a higher-order function. dw about all that
-  lambda calculus junk, where we're going you won't need it. you can't define
-  your own because idk how to write that down in a way that makes sense and is
+* combinator: in a loose sense, a higher-order function. dw about all that lambda calculus junk, where we're going you
+  won't need it. you can't define your own because idk how to write that down in a way that makes sense and is
   consistent with what I want.
 
 ## execution model
@@ -294,9 +294,8 @@ these are all valid:
      2 * 3            -- evaluate
      6                -- evaluate
     ```
-  * more (this is actually wrong cause it's evaluating `y` before the full quote
-    is expanded but whatever you get the point the quote expands and everything
-    is evaluated from there)
+  * more (this is actually wrong cause it's evaluating `y` before the full quote is expanded but whatever you get the
+    point the quote expands and everything is evaluated from there)
     ```
     avg =. (+/]) % (#])
     largest =. ([ <&avg ]) ~ ([,.])
@@ -318,14 +317,12 @@ these are all valid:
         (                                     1                                       ) ~  1 2 3 4 5 \n 1 1 1 1 80
                                                                                         1 1 1 1 80
     ```
-* parsing uses a symbol table to look up definitions to determine what syntax
-  is being constructed. it is known at parse time what each name refers to, so
-  the big-ass table above can be disambiguated.
-* each binding is determined to be an atom/function/combinator and checked for
-  validity
+* parsing uses a symbol table to look up definitions to determine what syntax is being constructed. it is known at parse
+  time what each name refers to, so the big-ass table above can be disambiguated.
+* each binding is determined to be an atom/function/combinator and checked for validity
 * execution stops at a quote
   * if it contains a reference to an argument, it is a function
 
 ## Inspiration
 
-J, [BYOL](http://www.buildyourownlisp.com/), APL, Scheme
+J, [BYOL](http://www.buildyourownlisp.com/), Dyalog APL, Scheme

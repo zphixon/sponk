@@ -8,8 +8,8 @@ mod parser;
 mod scanner;
 
 pub mod prelude {
-  pub use array::{Array, Element};
-  pub use error::SponkError;
-  pub use parser::{parse, Statement, Expression};
-  pub use scanner::{Scanner, Token, TokenKind};
+    pub use array::{Array, Element};
+    pub use error::SponkError;
+    pub use parser::{parse, Expression, Statement};
+    pub use scanner::{Scanner, Token, TokenKind};
 }
