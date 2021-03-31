@@ -526,6 +526,13 @@ mod test {
     #[test]
     fn scan17() {
         let mut s = Scanner::new("¯¯3");
-        panic!("{:?}", s.next_token().unwrap());
+        println!("{:?}", s.next_token().unwrap());
+    }
+
+    #[should_panic]
+    #[test]
+    fn scan18() {
+        let mut s = Scanner::new("'");
+        println!("{:?}", s.next_token().unwrap());
     }
 }
