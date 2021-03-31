@@ -88,30 +88,33 @@ mod test {
     fn parse1() {
         let s = Scanner::new("x+y");
         let v: Vec<_> = s.collect();
-        assert_eq!(
-            v,
-            vec![
-                Token::new(TokenKind::Ident, "x"),
-                Token::new(TokenKind::Builtin, "+"),
-                Token::new(TokenKind::Ident, "y")
-            ]
-        );
+        v.into_iter()
+            .zip(
+                vec![
+                    Token::no_span(TokenKind::Ident, "x"),
+                    Token::no_span(TokenKind::Builtin, "+"),
+                    Token::no_span(TokenKind::Ident, "y"),
+                ]
+                .into_iter(),
+            )
+            .map(|(a, b)| assert!(a.compare_no_span(b)))
+            .for_each(drop);
     }
 
     #[test]
     fn parse2() {
         let _src = "a = 1 + 2";
         let _a = Statement::Assign {
-            name: Token::new(TokenKind::Ident, "a"),
+            name: Token::no_span(TokenKind::Ident, "a"),
             expression: Expression::DyadCall {
                 rhs: Box::new(Expression::List {
-                    value: vec![Token::new(TokenKind::Int(1), "1")],
+                    value: vec![Token::no_span(TokenKind::Int(1), "1")],
                 }),
                 op: Box::new(Expression::Ident {
-                    name: Token::new(TokenKind::Ident, "+"),
+                    name: Token::no_span(TokenKind::Ident, "+"),
                 }),
                 lhs: Box::new(Expression::List {
-                    value: vec![Token::new(TokenKind::Int(2), "2")],
+                    value: vec![Token::no_span(TokenKind::Int(2), "2")],
                 }),
             },
         };
