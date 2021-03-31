@@ -3,80 +3,80 @@
 use crate::prelude::Token;
 
 /// syntax tree
-pub enum Statement<'a> {
+pub enum Statement {
     /// assign
     Assign {
         /// name
-        name: Token<'a>,
+        name: Token,
         /// expression
-        expression: Expression<'a>,
+        expression: Expression,
     },
     /// assign quote
     AssignQuote {
         /// name
-        name: Token<'a>,
+        name: Token,
         /// expression
-        expression: Expression<'a>,
+        expression: Expression,
     },
-    Expression(Expression<'a>),
+    Expression(Expression),
 }
 
-pub enum Expression<'a> {
+pub enum Expression {
     /// identifier
     Ident {
         /// name
-        name: Token<'a>,
+        name: Token,
     },
     /// list
     List {
         /// value
-        value: Vec<Token<'a>>,
+        value: Vec<Token>,
     },
     /// monad call
     MonadCall {
         /// operator
-        op: Box<Expression<'a>>,
+        op: Box<Expression>,
         /// operand
-        lhs: Box<Expression<'a>>,
+        lhs: Box<Expression>,
     },
     /// dyad call
     DyadCall {
         /// rhs operand
-        rhs: Box<Expression<'a>>,
+        rhs: Box<Expression>,
         /// operator
-        op: Box<Expression<'a>>,
+        op: Box<Expression>,
         /// lhs operand
-        lhs: Box<Expression<'a>>,
+        lhs: Box<Expression>,
     },
     /// quote
     Quote {
         /// colon
-        colon: Token<'a>,
+        colon: Token,
         /// expression
-        expression: Box<Expression<'a>>,
+        expression: Box<Expression>,
     },
     /// call
     Call {
-        expression: Box<Expression<'a>>,
-        colon: Token<'a>,
+        expression: Box<Expression>,
+        colon: Token,
     },
     /// spread
     Spread {
         /// verb
-        verb: Box<Expression<'a>>,
+        verb: Box<Expression>,
         /// slash
-        slash: Token<'a>,
+        slash: Token,
     },
     /// anon function
     Lambda {
         /// left brace
-        left_brace: Token<'a>,
+        left_brace: Token,
         /// expr
-        expression: Box<Expression<'a>>,
+        expression: Box<Expression>,
     },
 }
 
-pub fn parse() -> Option<Statement<'static>> {
+pub fn parse() -> Option<Statement> {
     None
 }
 
@@ -92,7 +92,7 @@ mod test {
             v,
             vec![
                 Token::new(TokenKind::Ident, "x"),
-                Token::new(TokenKind::Ident, "+"),
+                Token::new(TokenKind::Builtin, "+"),
                 Token::new(TokenKind::Ident, "y")
             ]
         );
@@ -105,13 +105,13 @@ mod test {
             name: Token::new(TokenKind::Ident, "a"),
             expression: Expression::DyadCall {
                 rhs: Box::new(Expression::List {
-                    value: vec![Token::new(TokenKind::Number, "1")],
+                    value: vec![Token::new(TokenKind::Int(1), "1")],
                 }),
                 op: Box::new(Expression::Ident {
                     name: Token::new(TokenKind::Ident, "+"),
                 }),
                 lhs: Box::new(Expression::List {
-                    value: vec![Token::new(TokenKind::Number, "2")],
+                    value: vec![Token::new(TokenKind::Int(2), "2")],
                 }),
             },
         };

@@ -2,6 +2,8 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+extern crate unicode_segmentation;
+
 mod array;
 mod error;
 mod parser;

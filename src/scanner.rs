@@ -2,211 +2,312 @@
 
 use crate::prelude::SponkError;
 
-/// is user/builtin identifier
-fn id(c: u8) -> bool {
-    !c.is_ascii_punctuation() && !c.is_ascii_whitespace()
+use std::iter::Peekable;
+use unicode_segmentation::{Graphemes, UnicodeSegmentation};
+
+fn is_builtin(s: &str) -> bool {
+    matches!(
+        s,
+        "-" | "`"
+            | "="
+            | "["
+            | "]"
+            | "\\"
+            | ";"
+            | ","
+            | "."
+            | "/"
+            | "~"
+            | "!"
+            | "@"
+            | "#"
+            | "$"
+            | "%"
+            | "^"
+            | "&"
+            | "*"
+            | "("
+            | ")"
+            | "_"
+            | "+"
+            | "{"
+            | "}"
+            | "|"
+            | ":"
+            | "\""
+            | "<"
+            | ">"
+            | "?"
+            | "⋄"
+            | "¨"
+            | "≤"
+            | "≥"
+            | "≠"
+            | "∨"
+            | "∧"
+            | "×"
+            | "÷"
+            | "⍵"
+            | "∊"
+            | "⍴"
+            | "↑"
+            | "↓"
+            | "⍳"
+            | "○"
+            | "←"
+            | "→"
+            | "⊢"
+            | "⍺"
+            | "⌈"
+            | "⌊"
+            | "∇"
+            | "∆"
+            | "∘"
+            | "⎕"
+            | "⍎"
+            | "⍕"
+            | "⊂"
+            | "⊥"
+            | "⊤"
+            | "⍝"
+            | "⍀"
+            | "⌿"
+            | "⌺"
+            | "⌶"
+            | "⍫"
+            | "⍒"
+            | "⍋"
+            | "⌽"
+            | "⍉"
+            | "⊖"
+            | "⍟"
+            | "⍱"
+            | "⌹"
+            | "⍷"
+            | "⍨"
+            | "⍸"
+            | "⍥"
+            | "⍣"
+            | "⍞"
+            | "⍬"
+            | "⊣"
+            | "⍤"
+            | "⌸"
+            | "⌷"
+            | "≡"
+            | "≢"
+            | "⊆"
+            | "⊃"
+            | "∩"
+            | "∪"
+            | "⍪"
+            | "⍙"
+            | "⍠"
+    )
+}
+fn is_whitespace(s: &str) -> bool {
+    // TODO: other weird forms of whitespace
+    s.len() == 1 && s.bytes().nth(0).unwrap().is_ascii_whitespace()
+}
+fn is_digit(s: &str) -> bool {
+    "0123456789".contains(s)
+}
+fn is_identifier(s: &str) -> bool {
+    !is_whitespace(s) && !is_builtin(s)
 }
 
 /// token kind
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum TokenKind {
-    /// left paren
     LeftParen,
-    /// right paren
     RightParen,
-    /// left arg
-    LeftArg,
-    /// right arg
-    RightArg,
-    /// left brace
     LeftBrace,
-    /// right brace
     RightBrace,
-    /// identifier
+    LeftBracket,
+    RightBracket,
     Ident,
-    /// colon equal
-    ColonEqual,
-    /// equal
-    Equal,
-    /// colon
-    Colon,
-    /// number
-    Number,
-    /// string
+    // any punctuation or APL character
+    Builtin,
+    Int(i64),
+    Float(f64),
+    Complex(f64, f64),
     String,
-    /// eof
     EOF,
 }
 
-/// token
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub struct Token<'a> {
+pub struct Span {
+    line: usize,
+    grapheme: usize,
+}
+
+/// token
+#[derive(PartialEq, Debug, Clone)]
+pub struct Token {
     /// kind
     kind: TokenKind,
     /// lexeme
-    lexeme: &'a str,
+    lexeme: String,
 }
 
-impl Token<'_> {
+impl Token {
     /// new
-    pub(crate) fn new(kind: TokenKind, lexeme: &str) -> Token<'_> {
-        Token { kind, lexeme }
+    pub(crate) fn new(kind: TokenKind, lexeme: impl ToString) -> Token {
+        Token {
+            kind,
+            lexeme: lexeme.to_string(),
+        }
     }
 }
 
+const YES_EXTENDED_GRAPHEMES: bool = true;
+
 /// scanner
-#[derive(Debug)]
 pub struct Scanner<'a> {
-    /// beginning
-    beginning: usize,
-    /// current
-    current: usize,
-    /// source
-    source: &'a [u8],
+    graphemes: Peekable<Graphemes<'a>>,
+    source: &'a str,
 }
 
 impl<'a> Scanner<'a> {
-    /// new
-    pub(crate) fn new(s: &str) -> Scanner<'_> {
+    pub fn new(source: &'a str) -> Scanner<'a> {
         Scanner {
-            beginning: 0,
-            current: 0,
-            source: s.as_bytes(),
+            graphemes: source.graphemes(YES_EXTENDED_GRAPHEMES).peekable(),
+            source,
         }
     }
 
-    /// next token
-    pub(crate) fn next_token(&mut self) -> Result<Token<'a>, SponkError> {
-        if self.at_end() {
-            Ok(Token::new(TokenKind::EOF, ""))
-        } else {
-            self.slurp_whitespace();
-            self.beginning = self.current;
-            Ok(Token::new(
-                match self.advance() {
-                    b'\0' => return Ok(Token::new(TokenKind::EOF, "")),
-                    b'\'' => self.string(),
+    pub fn next_token(&mut self) -> Result<Token, SponkError> {
+        let mut grapheme = self.graphemes.next().unwrap_or("");
+        while is_whitespace(grapheme) {
+            grapheme = self.graphemes.next().unwrap_or("");
+        }
 
-                    b':' => match self.peek() {
-                        b'=' => {
-                            self.advance();
-                            Ok(TokenKind::ColonEqual)
-                        }
-                        _ => Ok(TokenKind::Colon),
-                    },
-
-                    b'=' => Ok(TokenKind::Equal),
-
-                    b'(' => Ok(TokenKind::LeftParen),
-                    b')' => Ok(TokenKind::RightParen),
-
-                    b'L' => Ok(TokenKind::LeftArg),
-                    b'R' => Ok(TokenKind::RightArg),
-
-                    b'{' => Ok(TokenKind::LeftBrace),
-                    b'}' => Ok(TokenKind::RightBrace),
-
-                    c if c.is_ascii_digit() => self.number(),
-                    c if c.is_ascii_punctuation() => Ok(self.operator()),
-                    _ => Ok(self.ident()),
-                }?,
-                self.lexeme()?,
-            ))
+        match grapheme {
+            "" => Ok(Token::new(TokenKind::EOF, "")),
+            g @ "(" => Ok(Token::new(TokenKind::LeftParen, g)),
+            g @ ")" => Ok(Token::new(TokenKind::RightParen, g)),
+            g @ "{" => Ok(Token::new(TokenKind::LeftBrace, g)),
+            g @ "}" => Ok(Token::new(TokenKind::RightBrace, g)),
+            g @ "[" => Ok(Token::new(TokenKind::LeftBracket, g)),
+            g @ "]" => Ok(Token::new(TokenKind::RightBracket, g)),
+            g @ "¯" => self.number(g),
+            g @ "'" => self.string(g),
+            g if is_builtin(g) => Ok(Token::new(TokenKind::Builtin, g)),
+            g if is_digit(g) => self.number(g),
+            g if is_whitespace(g) => unreachable!(),
+            g => self.ident(g),
         }
     }
 
-    /// string
-    fn string(&mut self) -> Result<TokenKind, SponkError> {
-        while !self.at_end() && self.peek() != b'\'' {
-            if self.peek() == b'\\' {
-                self.advance();
-                if self.peek() != b'\'' {
-                    return Err(SponkError::UnknownEscapeCode);
+    fn string(&mut self, grapheme: &str) -> Result<Token, SponkError> {
+        let mut string = String::from(grapheme);
+        while let Some(&grapheme) = self.graphemes.peek() {
+            if grapheme == "\\" {
+                self.graphemes.next().unwrap();
+                if let Some(&quote) = self.graphemes.peek() {
+                    if quote != "'" {
+                        return Err(SponkError::UnknownEscapeCode);
+                    }
                 }
+                string.push_str("\\'");
+            } else {
+                string.push_str(grapheme);
             }
-            self.advance();
-        }
-        if self.at_end() {
-            Err(SponkError::UnterminatedString)
-        } else {
-            self.advance();
-            Ok(TokenKind::String)
-        }
-    }
 
-    /// builtin op
-    fn operator(&mut self) -> TokenKind {
-        while self.peek() == b'.' {
-            self.advance();
-        }
-        TokenKind::Ident
-    }
-
-    /// identifier
-    fn ident(&mut self) -> TokenKind {
-        while id(self.peek()) && !self.at_end() {
-            self.advance();
-        }
-        while self.peek() == b'.' {
-            self.advance();
-        }
-        TokenKind::Ident
-    }
-
-    /// number
-    fn number(&mut self) -> Result<TokenKind, SponkError> {
-        while self.peek().is_ascii_digit() {
-            self.advance();
-        }
-        if self.peek() == b'.' {
-            self.advance();
-            while self.peek().is_ascii_digit() {
-                self.advance();
+            if grapheme == "'" {
+                self.graphemes.next().unwrap();
+                return Ok(Token::new(TokenKind::String, string));
             }
-            self.lexeme()?.parse::<f64>()?;
-        } else {
-            self.lexeme()?.parse::<i64>()?;
+
+            self.graphemes.next().unwrap();
         }
-        Ok(TokenKind::Number)
+
+        Err(SponkError::UnterminatedString)
     }
 
-    /// slurp whitespace
-    fn slurp_whitespace(&mut self) {
-        while self.peek().is_ascii_whitespace() {
-            self.advance();
+    fn ident(&mut self, grapheme: &str) -> Result<Token, SponkError> {
+        let mut ident = String::from(grapheme);
+        while let Some(&grapheme) = self.graphemes.peek() {
+            if is_identifier(grapheme) {
+                ident.push_str(grapheme);
+            } else {
+                break;
+            }
+            self.graphemes.next().unwrap();
         }
+        Ok(Token::new(TokenKind::Ident, ident))
     }
 
-    /// at end
-    fn at_end(&self) -> bool {
-        self.current >= self.source.len()
-    }
+    fn number(&mut self, grapheme: &str) -> Result<Token, SponkError> {
+        let mut number = String::from(grapheme);
 
-    /// advance
-    fn advance(&mut self) -> u8 {
-        self.current += 1;
-        self.source.get(self.current - 1).copied().unwrap_or(b'\0')
-    }
-
-    /// peek
-    fn peek(&mut self) -> u8 {
-        if self.at_end() {
-            b'\0'
-        } else {
-            self.source[self.current]
+        while let Some(&grapheme) = self.graphemes.peek() {
+            if is_digit(grapheme) {
+                number.push_str(grapheme);
+            } else if grapheme == "." {
+                return self.float(number);
+            } else if grapheme == "J" || grapheme == "j" {
+                return self.complex(number);
+            } else if grapheme == "E" || grapheme == "e" {
+                return self.scientific(number);
+            } else {
+                break;
+            }
+            self.graphemes.next().unwrap();
         }
+
+        Ok(Token::new(
+            TokenKind::Int(number.replace("¯", "-").parse()?),
+            number,
+        ))
     }
 
-    /// lexeme
-    fn lexeme(&self) -> Result<&'a str, SponkError> {
-        Ok(std::str::from_utf8(
-            &self.source[self.beginning..self.current],
-        )?)
+    fn float(&mut self, mut number: String) -> Result<Token, SponkError> {
+        assert_eq!(".", self.graphemes.next().unwrap());
+        number.push('.');
+
+        while let Some(&grapheme) = self.graphemes.peek() {
+            if is_digit(grapheme) {
+                number.push_str(grapheme);
+            } else if grapheme == "J" || grapheme == "j" {
+                return self.complex_float(number);
+            } else if grapheme == "E" || grapheme == "e" {
+                return self.scientific_float(number);
+            } else {
+                break;
+            }
+            self.graphemes.next().unwrap();
+        }
+
+        Ok(Token::new(
+            TokenKind::Float(number.replace("¯", "-").parse()?),
+            number,
+        ))
+    }
+
+    fn complex(&mut self, _number: String) -> Result<Token, SponkError> {
+        todo!("complex integer")
+    }
+
+    fn scientific(&mut self, _number: String) -> Result<Token, SponkError> {
+        todo!("scientific integer")
+    }
+
+    fn complex_float(&mut self, _number: String) -> Result<Token, SponkError> {
+        todo!("complex float")
+    }
+
+    fn scientific_float(&mut self, _number: String) -> Result<Token, SponkError> {
+        todo!("scientific float")
+    }
+
+    fn complex_scientific_float(&mut self, _number: String) -> Result<Token, SponkError> {
+        todo!("complex scientific float")
     }
 }
 
-impl<'a> Iterator for Scanner<'a> {
-    type Item = Token<'a>;
+impl Iterator for Scanner<'_> {
+    type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token().ok().filter(|t| t.kind != TokenKind::EOF)
     }
@@ -218,17 +319,16 @@ mod test {
 
     #[test]
     fn scan1() {
-        let mut s = Scanner::new("[[::[]]::]");
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftArg, "[")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftArg, "[")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftArg, "[")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
+        let mut s = Scanner::new("{⍎:EJ≠<≠∨jjjjjj");
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍎")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "EJ")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "≠")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "<")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "≠")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "∨")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "jjjjjj")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::EOF, "")));
     }
 
@@ -237,28 +337,28 @@ mod test {
         let mut s = Scanner::new("{} :{}]:][:{]:}}{]:");
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBrace, "}")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBrace, "}")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftArg, "[")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBracket, "]")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBracket, "]")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBracket, "[")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBracket, "]")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBrace, "}")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBrace, "}")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBracket, "]")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
     }
 
     #[test]
     fn scan3() {
         let mut s = Scanner::new("                 1");
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Number, "1")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Int(1), "1")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::EOF, "")));
     }
 
@@ -266,19 +366,22 @@ mod test {
     fn scan4() {
         let mut s = Scanner::new("{223}");
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Number, "223")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Int(223), "223")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightBrace, "}")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::EOF, "")));
     }
 
     #[test]
     fn scan5() {
-        let mut s = Scanner::new("] ]:3.14:{  ");
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Number, "3.14")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        let mut s = Scanner::new("⍵ ⍵:3.14:{  ");
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍵")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍵")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
+        assert_eq!(
+            s.next_token(),
+            Ok(Token::new(TokenKind::Float(3.14), "3.14"))
+        );
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::EOF, "")));
     }
@@ -287,11 +390,14 @@ mod test {
     fn scan6() {
         let mut s = Scanner::new("i:ii i 32.4:i");
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "i")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "ii")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "i")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Number, "32.4")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        assert_eq!(
+            s.next_token(),
+            Ok(Token::new(TokenKind::Float(32.4), "32.4"))
+        );
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "i")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::EOF, "")));
     }
@@ -318,52 +424,59 @@ mod test {
 
     #[test]
     fn scan9() {
-        let mut s = Scanner::new("{i3289:jeiwe328 38.3");
+        let mut s = Scanner::new("{i3289⍺jeiwe328 38.3");
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftBrace, "{")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "i3289")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍺")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "jeiwe328")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Number, "38.3")));
+        assert_eq!(
+            s.next_token(),
+            Ok(Token::new(TokenKind::Float(38.3), "38.3"))
+        );
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::EOF, "")));
     }
 
     #[test]
     fn scan10() {
-        let mut s = Scanner::new("amp:=[:[]:[:]");
+        let mut s = Scanner::new("amp:=⍺:⍺⍵:⍺:⍵");
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "amp")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::ColonEqual, ":=")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftArg, "[")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftArg, "[")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::LeftArg, "[")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Colon, ":")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::RightArg, "]")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "=")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍺")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍺")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍵")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍺")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, ":")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍵")));
         assert_eq!(s.next_token(), Ok(Token::new(TokenKind::EOF, "")));
     }
 
     #[test]
     fn scan11() {
-        let v: Vec<_> = Scanner::new("x := 1 2 3 4 5").map(|t| t.lexeme).collect();
-        assert_eq!(v, vec!["x", ":=", "1", "2", "3", "4", "5"]);
-        let v: Vec<_> = Scanner::new("y := 6 7 8 9 10").map(|t| t.lexeme).collect();
-        assert_eq!(v, vec!["y", ":=", "6", "7", "8", "9", "10"]);
+        let v: Vec<_> = Scanner::new("x ← 1 2 3 4 5").map(|t| t.lexeme).collect();
+        assert_eq!(v, vec!["x", "←", "1", "2", "3", "4", "5"]);
+        let v: Vec<_> = Scanner::new("y ← 6 7 8 9 10").map(|t| t.lexeme).collect();
+        assert_eq!(v, vec!["y", "←", "6", "7", "8", "9", "10"]);
         let v: Vec<_> = Scanner::new("x + y").map(|t| t.lexeme).collect();
         assert_eq!(v, vec!["x", "+", "y"]);
-        let v: Vec<_> = Scanner::new("#$x").map(|t| t.lexeme).collect();
-        assert_eq!(v, vec!["#", "$", "x"]);
-        let v: Vec<_> = Scanner::new("{]+]}x").map(|t| t.lexeme).collect();
-        assert_eq!(v, vec!["{", "]", "+", "]", "}", "x"]);
-        let v: Vec<_> = Scanner::new("{1+]}(f 1 2 3 4 5)")
+        let v: Vec<_> = Scanner::new("⍴⍴x").map(|t| t.lexeme).collect();
+        assert_eq!(v, vec!["⍴", "⍴", "x"]);
+        let v: Vec<_> = Scanner::new("{⍵+⍵}x").map(|t| t.lexeme).collect();
+        assert_eq!(v, vec!["{", "⍵", "+", "⍵", "}", "x"]);
+        let v: Vec<_> = Scanner::new("{1+⍵}(f 1 2 3 4 5)")
             .map(|t| t.lexeme)
             .collect();
         assert_eq!(
             v,
-            vec!["{", "1", "+", "]", "}", "(", "f", "1", "2", "3", "4", "5", ")"]
+            vec!["{", "1", "+", "⍵", "}", "(", "f", "1", "2", "3", "4", "5", ")"]
         );
         let v: Vec<_> = Scanner::new("amp:=[:[ ]: [:]").map(|t| t.lexeme).collect();
-        assert_eq!(v, vec!["amp", ":=", "[", ":", "[", "]", ":", "[", ":", "]"]);
+        assert_eq!(
+            v,
+            vec!["amp", ":", "=", "[", ":", "[", "]", ":", "[", ":", "]"]
+        );
     }
 
     #[test]
@@ -371,21 +484,48 @@ mod test {
         let v: Vec<_> = Scanner::new("+...+~$#@*-*::").map(|t| t.lexeme).collect();
         assert_eq!(
             v,
-            vec!["+...", "+", "~", "$", "#", "@", "*", "-", "*", ":", ":"]
+            vec!["+", ".", ".", ".", "+", "~", "$", "#", "@", "*", "-", "*", ":", ":"]
         );
     }
 
     #[test]
     fn scan13() {
-        let mut s = Scanner::new("+.. -. x....");
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "+..")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "-.")));
-        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Ident, "x....")));
+        let mut s = Scanner::new("!⌹÷÷×⍥");
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "!")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⌹")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "÷")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "÷")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "×")));
+        assert_eq!(s.next_token(), Ok(Token::new(TokenKind::Builtin, "⍥")));
     }
 
     #[test]
     fn scan14() {
         let v: Vec<_> = Scanner::new("x+y").map(|t| t.lexeme).collect();
         assert_eq!(v, vec!["x", "+", "y"]);
+    }
+
+    #[test]
+    fn scan15() {
+        let mut s = Scanner::new("¯1398 heeehe");
+        assert_eq!(s.next(), Some(Token::new(TokenKind::Int(-1398), "¯1398")));
+        assert_eq!(s.next(), Some(Token::new(TokenKind::Ident, "heeehe")));
+    }
+
+    #[test]
+    fn scan16() {
+        let mut s = Scanner::new("¯13.98 heeehe");
+        assert_eq!(
+            s.next(),
+            Some(Token::new(TokenKind::Float(-13.98), "¯13.98"))
+        );
+        assert_eq!(s.next(), Some(Token::new(TokenKind::Ident, "heeehe")));
+    }
+
+    #[should_panic]
+    #[test]
+    fn scan17() {
+        let mut s = Scanner::new("¯¯3");
+        panic!("{:?}", s.next_token().unwrap());
     }
 }
