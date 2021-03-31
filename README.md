@@ -12,211 +12,338 @@ I love the shit out of them.
 * [ ] interpreter
 * [ ] compiler to shader language????
 * [ ] row polymorphism??
+* [ ] should we call it tree-oriented instead of array-oriented?
+
+symbols:
+
+```
+`1234567890-=qwertyuiop[]\asdfghjkl;'zxcvbnm,./
+~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:"ZXCVBNM<>?
+⋄¨¯<≤=≥>≠∨∧×÷?⍵∊⍴~↑↓⍳○*←→⊢⍺⌈⌊_∇∆∘'⎕⍎⍕⊂⊥⊤|⍝⍀⌿
+⌺⌶⍫⍒⍋⌽⍉⊖⍟⍱!⌹⍷⍨⍸⍥⍣⍞⍬⊣⍺⍤⌸⌷≡≢⊆⊃∩∪⍪⍙⍠
+```
 
 ## lil ideas
 
 if ⍴⍴array > 2 you can name the ranks??? that sounds super dope, and select ranks like ⌽⍉⊖ with those names instead of
 ridiculous [rank] syntax
 
+### Data types
+
+* bool (maybe?)
+* integer
+* floating point
+* real
+* ratio
+* string
+* atom (`∆atom`)
+* array: honestly the term 'array' is a little misleading. it's more like a tree, but in array programming languages we
+  tend to give names to the special cases. a flat tree we know as a vector, a flat tree of n-vectors we call a matrix, a
+  flat tree of flat trees of n-vectors we call a cube, and so on.
+
 Sponk operates on n-dimensional arrays.
 
-```
-    x = 1 2 3 4 5
-    y = 6 7 8 9 10
+```apl
+    x ← 1 2 3 4 5
+    y ← 6 7 8 9 10
     x + y
-7 9 11 13 15
+┌→───────────┐
+│7 9 11 13 15│
+└~───────────┘
 
-    x * y
-6 14 24 36 50
+    x × y
+┌→──────────-─┐
+│6 14 24 36 50│
+└~──────────-─┘
 
+    ⍴ x
+5
+    ⍴⍴ x
+1
     # x
 5
-    $ x
-5
-    # ($ x)
-1
+    ⍝ there *is* a difference between ⍴ and #!
 ```
 
 You can manipulate arrays with several operators.
 
-```
-    -- list manipulation
-    x = 1 2 3 4 5
-    y = 6 7 8 9 10
-    z = 11 12 13 14 15
+```apl
+    ⍝ list manipulation
+    x ← 1 2 3 4 5
+    y ← 6 7 8 9 10
+    z ← 11 12 13 14 15
 
-    -- append
+    ⍝ append
     x,y,z
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+┌→──────────────────────────────────┐
+│1 2 3 4 5 6 7 8 9 10 11 12 13 14 15│
+└~──────────────────────────────────┘
 
-    -- push
-    x,.y
-1 2 3 4 5
-6 7 8 9 10
+    ⍝ push
+    x⍪y
+┌→─────────┐
+↓1 2 3 4  5│
+│6 7 8 9 10│
+└~─────────┘
 
-    x,.y,.z
- 1  2  3  4  5
- 6  7  8  9 10
-11 12 13 14 15
+    x⍪y⍪z
+┌→─────────────┐
+↓ 1  2  3  4  5│
+│ 6  7  8  9 10│
+│11 12 13 14 15│
+└~─────────────┘
 
-    -- shape, length, rank of arrays
-    a = x,.y,.z
-    # a -- a has three elements
-3
-    $ a -- a is a 3x5 array
+    ⍝ shape, length, rank of arrays
+    a ← x⍪y⍪z
+    ⍴ a       ⍝ a is a 3x5 array
 3 5
-    # $ a -- a is rank 2 (2-dimensional)
+    1 ⌷ ⍴ a   ⍝ a has three elements in its first rank
+3
+    ⍴⍴ a      ⍝ a is rank 2 (2-dimensional)
 2
 
-    -- pick
-    0 ~ 1 2 3 4
+    ⍝ pick
+    1 ⌷ 1 2 3 4
 1
-    8 ~ 1 2 3 4
+    8 ⌷ 1 2 3 4
 ╭ index out of bounds
-│   8 ~ 1 2 3 4
+│   8 ⌷ 1 2 3 4
 ╰ wanted 8, but array is length 4
 
-    1 ~ a
+    2 ⌷ a
 6 7 8 9 10
 
-    3 1 ~ a
+    ⍝ multi-dimensional indexing: start with the largest rank first
+    2 4 ⌷ a
 9
 
-    0 1 ~ 1 2 3 4
+    1 1 ⌷ 1 2 3 4
 ╭ rank mismatch
-│   0 1 ~ 1 2 3 4
+│   1 1 ⌷ 1 2 3 4
 ╰ array is rank 1, but picked 2nd order element
 ```
 
-### Quotes are functions
+### Quotes and functions
 
-```
-    x = 32
+```apl
+    x ← 32
 
-    -- quote the expression
+    ⍝ quote the expression
     {x + x}
 {x+x}
 
-    -- evaluate the expression with empty argument :
-    {x+x} :
+    ⍝ evaluate the expression with empty argument ⍬
+    {x+x} ⍬
 64
 
-    -- quotes are lazy
-    2x = {x + x}
-    2x:
+    ⍝ quotes are lazy
+    twox ← {x + x}
+    twox ⍬
 64
 
-    x = 8
-    2x:
+    x ← 8
+    twox ⍬
 16
 
-    -- ] is right arg, [ is left arg
-    {] + ]}
+    ⍝ ⍺ is right arg, ⍵ is left arg
+    {⍵ + ⍵}
 {]+]}
 
-    -- evaluate without argument
-    {] + ]} :
+    ⍝ evaluate without argument
+    {⍵ + ⍵} ⍬
 ╭ missing argument
-│   {]+]}:
+│   {⍵+⍵}⍬
 ╰ expected right argument, got nothing
 
-    -- try again with an argument
-    {] + ]} x
+    ⍝ try again with an argument
+    {⍵ + ⍵} x
 64
 
-    -- you might call a name bound to a quote with arguments a function
-    double = {] + ]}
+    ⍝ you might call a name bound to a quote with arguments a function
+    double ← {⍵ + ⍵}
     double
-{]+]}
+{⍵+⍵}
 
-    double x
-64
-
-    -- use =. to automatically quote the expression
-    double =. ] + ]
     double x
 64
 ```
 
 ### Arguments
 
-`[` and `]` refer to the left and right arguments of the quote they're inside. You can use `[.` and `].` to refer to
-arguments of outer quotes, and even further up with more `.`.
+TODO: meh
 
-### Documentation, aliases for built-in quotes
+`⍺` and `⍵` refer to the left and right arguments of the quote they're inside.
+⍺⍺ ⍵⍵ yes. ⍺⍵ ⍵⍺ ⍵⍺⍺ ⍺⍵⍵ ⍺⍵⍺ ⍵⍺⍵ ⍺⍺⍵ ⍵⍵⍺ etc?
 
+### Documentation, aliases for built-in functions
+
+```apl
+    )help ⍴
+Shape
+⍴ ⍵ - Length of each rank of ⍵
+e.g.
+    a ← 1 2 3 4
+    ⍴ a
+4
+    a ← a⍪a
+    ⍴ a
+2 4
+
+⍺ ⍴ ⍵ - Change the shape of ⍵ to fit the dimensions specified by ⍺
+e.g.
+    ⍳12
+1 2 3 4 5 6 7 8 9 10 11 12
+    3 4 ⍴ ⍳12
+1  2  3  4
+5  6  7  8
+9 10 11 12
+
+    db ← {⍵ + ⍵}
+    )doc db 'Doubles the right argument.'
+
+    )help db
+db - Doubles the right argument.
 ```
-    Help '$'
-$: Returns the length of each rank of the right argument.
-Also written as Shape. See also #.
 
-    db =. ] + ]
-    'db' Doc 'Doubles the right argument.'
+### Shape as structure
 
-    Help 'db'
-db: Doubles the right argument.
-db =. ]+]
-```
+Matrices are super cool, but they aren't all that useful if you want to assign more meaningful structure to your data.
+Hence some mechanisms available for adding semantic structure to your data.
 
-### Variations
+```apl
+    ⍝ we all know and love types, but classic APL/J/etc don't really *do* them very well.
+    ⍝ I don't really think array-based languages are good for 
 
-```
-    -- we've seen `,` and `,.`, how do we make our own?
-    x =. 2*]
-    x 10
-20
+    ⍝ say you want to represent a person. what you might do in APL:
+    robert ← 'Robert Dufresne' 1992 6 4
+    ⍝ and just remember that the first item of a person is their name, the second is their birth year, and so on.
+    ⍝ or, use types!! note that strings are true character vectors. this robert is a 'mixed vector'.
 
-    x. =. 3+]
-    x 10
-20
-    x. 10
-13
+    ⍝ dyad ⎕ defines a type constructor. you must quote the inner types as atoms:
+    ∆name ⎕ ∆str
+    ∆year ⎕ ∆int
+    ∆month ⎕ ∆int
+    ∆day ⎕ ∆int
+    ∆person ⎕ ∆name ∆year ∆month ∆day
 
-    -- oh
-    x.. =. [+ 2*]
-    10 x.. 10
-30
+    ⍝ use the type constructor with a 2xn shape array:
+    robert ← person (name 'Robert Dufresne') (year 1992) (month 6) (day 4)
 
-    -- document each one separately
-    'x' Doc 'Double the right argument'
-    'x.' Doc 'Add three to the right argument'
-    'x..' Doc 'Two times the left argument plus the right argument'
+    ⍴ robert
+∆name ∆year ∆month ∆day
+    # robert     ⍝ dope!
+4
+    
+    ⍝ use ⌷ to get each property
+    ∆name ⌷ robert
+'Robert Dufresne'
+    ∆year ⌷ robert
+1992
+
+    ⍝ another
+    michael ← person (name 'Michael Tomlinson') (year 1989) (month 8) (day 17)
+
+    ⍝ and now, for a magic trick
+    people ← robert,michael
+    people
+person (name 'Robert Dufresne') (year 1992) (month 6) (day 4)
+person (name 'Michael Tomlinson') (year 1989) (month 8) (day 17)
+
+    ∆name ⌷ people
+'Robert Dufresne' 'Michael Tomlinson'
+
+    ⍝ 🤯
+
+    ⍝ there's an example data set from 'Mastering Dyalog APL' called Prod. it's defined as follows:
+    ⍝ rank 1: years of production for our factory
+    ⍝ rank 2: each individual production line
+    ⍝ rank 3: each month's produced goods
+    Prod
+┌┌→──────────────────────────────────┐
+↓↓26 16 22 17 21 44 25 22 23 44 41 33│
+││43 36 47 49 30 22 57 20 45 60 43 22│
+││                                   │
+││44 21 58 57 17 43 47 17 43 26 53 23│
+││29 19 23 38 53 47 38 22 40 57 35 26│
+││                                   │
+││37 27 53 26 29 46 25 26 30 20 32 16│
+││56 55 25 47 38 27 39 59 20 28 42 25│
+││                                   │
+││21 57 55 44 16 54 26 16 55 56 45 45│
+││16 55 26 20 27 55 36 39 43 38 50 16│
+││                                   │
+││27 23 56 41 53 60 39 47 44 47 17 28│
+││24 35 61 26 22 35 24 20 31 35 47 37│
+└└~──────────────────────────────────┘
+
+    ⍝ without looking at the explanation above, how exactly do you get March's production statistics
+    ⍝ for the second assembly line from two years ago (assuming it is now january)? it's hard to remember
+    ⍝ the exact shape of our data in this form, which is why we invented databases in the first place!
+
+    ⍝ in APL, perhaps: which is which?
+    2 2 3 ⌷ ⊖Prod
+26
+    ⍝ alternatively
+    (⊖Prod)[2;2;3]
+26
+
+    ⍝ define a shape-type with ⎕
+    ∆year ⎕ ∆int
+    ∆line ⎕ ∆int
+    ∆month ⎕ ∆int
+    ∆productionLine ⎕ ∆year ∆line ∆month
+
+    ⍝ write Prod initially like
+    Prod ← ∆productionLine ((26 16 22 17 ...) (43 36 47 49 ...)) ((44 21 ...) ...) ...
+
+    ⍝ or reshape the existing prod
+    newProd ← ∆productionLine ⍴ Prod
+    ⍴ newProd
+∆year ∆line ∆month
+    (∆year 2) (∆line 2) (∆month 3) ⌷⊖newProd
+26
+    (⊖newProd)[∆year 2; ∆line 2; ∆month 3]
+26
+
+    ⍝ the ⌷ syntax for indexing is better don't @ me
 ```
 
 ### Spread, unquote
 
 ```
-    -- equivalent to 1 + 2 + 3 + 4 + 5
+    ⍝ equivalent to 1 + 2 + 3 + 4 + 5
     +/ 1 2 3 4 5
 
-    -- spread left argument through 2* right argument
-    f =. [/ (2*])
+    ⍝ spread left argument through 2* right argument
+    f ← {⍺/ 2*⍵}
 
-    {1+]} f 1 2 3 4 5
+    {1+⍵} f 1 2 3 4 5
 ╭ not a dyad
-│   f=.[/2*]
+│   f←{⍺/2*⍵}
 │ '/' requires a dyad
-╰   {1+]} f 1 2 3 4 5
+╰   {1+⍵} f 1 2 3 4 5
 
-    -- so you need to pass a dyad instead
-    {[+1+]} f 1 2 3 4 5
+    ⍝ so you need to pass a dyad instead
+    {⍺+1+⍵} f 1 2 3 4 5
 34
 
-    -- spread + through right argument, divide by length of right argument
-    avg =. (+/]) % (#])
+    ⍝ spread + through right argument, divide by length of right argument
+    avg ← {(+/ ⍵) ÷ (⍴ ⍵)}
     avg 42 8 15 4 16 23
 18
 
-    -- choose the array with the larger average
-    largest =. ([ <&avg ]) ~ ([,.])
+    ⍝ choose the array with the larger average
+    largest ← {(1 + avg ⍺ < avg ⍵) ⌷ (⍺⍪⍵)}
 
-    x = 1 2 3 4 5
-    y = 1 1 1 1 80
+    x ← 1 2 3 4 5
+    y ← 1 1 1 1 80
     x largest y
 1 1 1 1 80
 ```
 
 ### "Combinators"
+
+TODO: does this still make sense if we're gonna do what we have above? idk
 
 Unlike J, functions will always be surrounded by their arguments. The implicit "hook" and "fork" constructs are made
 explicit in Sponk. Using the parenthesized versions will expand the functions every time they are referenced, but the
@@ -240,36 +367,31 @@ combinator versions will not.
   * copy/paste from J
 * quotes
   * left and right arguments
-* errors
+* errors -------- make these good
   * report early and often, especially syntax
-* able to browse the source code on github for mobile without scrolling
-  horizontally
 
 ## syntax tree maybe
 
-* `double =. ] + ]`
+* `double ← {⍵ + ⍵}`
   add the right argument to the right argument
-  `(+ right right)`
-* `f =. [/ 2*]`
+  `(+ ⍵ ⍵)`
+* `f ← {⍺/ 2*⍵}`
   multiply 2 times the right argument, then spread the left argument through
   that result
-  `(/ left (* 2 right))`
-* `avg =. (+/]) % #]`
+  `(/ ⍺ (* 2 ⍵))`
+* `avg ← {+/⍵ ÷ ⍴⍵}`
   spread + through the right argument, then find the length of the right
   argument, then divide
-  `(% (/ + right) (# right))`
-* `l =. ([ &<avg ]) ~ ([,.])`
+  `(÷ (/ + ⍵) (⍴ ⍵))`
+* `l ← {avg ⍺ < avg ⍵ ⌷ ⍺⍪⍵}`
   average the right argument, then average the left argument, compare their
   results. push the right argument to the left argument, pick.
   `(~ (,. (left right)) (< (avg right) (avg left)))`
 
-identifiers are are ascii alphanumeric or ascii punctuation
-* excluding `:`, `[`, `]`, `{`, `}`
-* user-defined `[a-z][a-zA-Z0-9]*\.*`
-* built-in `[A-Z][a-zA-Z0-9]*\.*`
-
-these are all valid:
-* `ding`, `d0ng`, `+.`, `-`
+user-identifiers are utf-8, excluding symbols:
+```
+-`=[]\;',./~!@#$%^&*()_+{}|:"<>?⋄¨¯<≤=≥>≠∨∧×÷?⍵∊⍴~↑↓⍳○*←→⊢⍺⌈⌊_∇∆∘'⎕⍎⍕⊂⊥⊤|⍝⍀⌿⌺⌶⍫⍒⍋⌽⍉⊖⍟⍱!⌹⍷⍨⍸⍥⍣⍞⍬⊣⍺⍤⌸⌷≡≢⊆⊃∩∪⍪⍙⍠
+```
 
 ## more rigid definitions/thoughts
 
@@ -326,3 +448,5 @@ these are all valid:
 ## Inspiration
 
 J, [BYOL](http://www.buildyourownlisp.com/), Dyalog APL, Scheme
+
+⍴⍴⍴ your boat
