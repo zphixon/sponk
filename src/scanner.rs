@@ -1,9 +1,10 @@
 //! scanner
 
-use crate::prelude::SponkError;
+use crate::prelude::{anyhow, ErrorKind, Result};
+
+use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
 use std::iter::Peekable;
-use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
 fn is_builtin(s: &str) -> bool {
     matches!(
@@ -153,12 +154,16 @@ impl Span {
     }
 }
 
+impl std::fmt::Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "line {} char {}", self.line, self.grapheme_index_in_line)
+    }
+}
+
 /// token
 #[derive(PartialEq, Debug, Clone)]
 pub struct Token {
-    /// kind
     kind: TokenKind,
-    /// lexeme
     lexeme: String,
     span: Span,
 }
@@ -186,6 +191,18 @@ impl Token {
 
     pub(crate) fn compare_no_span(&self, other: Token) -> bool {
         self.kind == other.kind && self.lexeme == other.lexeme
+    }
+
+    pub fn kind(&self) -> TokenKind {
+        self.kind
+    }
+
+    pub fn lexeme(&self) -> &str {
+        &self.lexeme
+    }
+
+    pub fn span(&self) -> Span {
+        self.span
     }
 }
 
@@ -234,7 +251,7 @@ impl<'a> Scanner<'a> {
         self.graphemes.peek().cloned()
     }
 
-    pub fn next_token(&mut self) -> Result<Token, SponkError> {
+    pub fn next_token(&mut self) -> Result<Token> {
         let mut grapheme = self.next_grapheme().unwrap_or("");
         while is_whitespace(grapheme) {
             grapheme = self.next_grapheme().unwrap_or("");
@@ -257,14 +274,16 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn string(&mut self, grapheme: &str) -> Result<Token, SponkError> {
+    fn string(&mut self, grapheme: &str) -> Result<Token> {
         let mut string = String::from(grapheme);
         while let Some(grapheme) = self.peek_grapheme() {
             if grapheme == "\\" {
                 self.next_grapheme().unwrap();
                 if let Some(quote) = self.peek_grapheme() {
                     if quote != "'" {
-                        return Err(SponkError::UnknownEscapeCode);
+                        return Err(anyhow!(ErrorKind::UnknownEscapeCode {
+                            code: quote.to_string(),
+                        }));
                     }
                 }
                 string.push_str("\\'");
@@ -280,10 +299,10 @@ impl<'a> Scanner<'a> {
             self.next_grapheme().unwrap();
         }
 
-        Err(SponkError::UnterminatedString)
+        Err(anyhow!(ErrorKind::UnterminatedString { span: self.span() }))
     }
 
-    fn ident(&mut self, grapheme: &str) -> Result<Token, SponkError> {
+    fn ident(&mut self, grapheme: &str) -> Result<Token> {
         let mut ident = String::from(grapheme);
         while let Some(grapheme) = self.peek_grapheme() {
             if is_identifier(grapheme) {
@@ -296,7 +315,7 @@ impl<'a> Scanner<'a> {
         Ok(Token::new(TokenKind::Ident, ident, self.span()))
     }
 
-    fn number(&mut self, grapheme: &str) -> Result<Token, SponkError> {
+    fn number(&mut self, grapheme: &str) -> Result<Token> {
         let mut number = String::from(grapheme);
 
         while let Some(grapheme) = self.peek_grapheme() {
@@ -315,13 +334,19 @@ impl<'a> Scanner<'a> {
         }
 
         Ok(Token::new(
-            TokenKind::Int(number.replace("¯", "-").parse()?),
+            TokenKind::Int(number.replace("¯", "-").parse::<i64>().map_err(|e| {
+                ErrorKind::SyntaxError {
+                    // TODO there's probably a better wya of doing this
+                    why: anyhow!(e),
+                    span: self.span(),
+                }
+            })?),
             number,
             self.span(),
         ))
     }
 
-    fn float(&mut self, mut number: String) -> Result<Token, SponkError> {
+    fn float(&mut self, mut number: String) -> Result<Token> {
         assert_eq!(".", self.next_grapheme().unwrap());
         number.push('.');
 
@@ -339,29 +364,34 @@ impl<'a> Scanner<'a> {
         }
 
         Ok(Token::new(
-            TokenKind::Float(number.replace("¯", "-").parse()?),
+            TokenKind::Float(number.replace("¯", "-").parse::<f64>().map_err(|e| {
+                ErrorKind::SyntaxError {
+                    why: anyhow!(e),
+                    span: self.span(),
+                }
+            })?),
             number,
             self.span(),
         ))
     }
 
-    fn complex(&mut self, _number: String) -> Result<Token, SponkError> {
+    fn complex(&mut self, _number: String) -> Result<Token> {
         todo!("complex integer")
     }
 
-    fn scientific(&mut self, _number: String) -> Result<Token, SponkError> {
+    fn scientific(&mut self, _number: String) -> Result<Token> {
         todo!("scientific integer")
     }
 
-    fn complex_float(&mut self, _number: String) -> Result<Token, SponkError> {
+    fn complex_float(&mut self, _number: String) -> Result<Token> {
         todo!("complex float")
     }
 
-    fn scientific_float(&mut self, _number: String) -> Result<Token, SponkError> {
+    fn scientific_float(&mut self, _number: String) -> Result<Token> {
         todo!("scientific float")
     }
 
-    fn complex_scientific_float(&mut self, _number: String) -> Result<Token, SponkError> {
+    fn complex_scientific_float(&mut self, _number: String) -> Result<Token> {
         todo!("complex scientific float")
     }
 }
@@ -376,7 +406,6 @@ impl Iterator for Scanner<'_> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::prelude::*;
 
     #[test]
     fn scan1() {
@@ -816,6 +845,15 @@ mod test {
     #[test]
     fn scan18() {
         let mut s = Scanner::new("'");
+        println!("{:?}", s.next_token().unwrap());
+    }
+
+    #[should_panic]
+    #[test]
+    fn scan19() {
+        let mut s = Scanner::new(
+            "578419057648432954637895647381946573821964378912467389216473812964739821",
+        );
         println!("{:?}", s.next_token().unwrap());
     }
 }

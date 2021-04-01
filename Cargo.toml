@@ -2,6 +2,9 @@
 name = "sponk"
 version = "0.1.0"
 authors = ["Zack <zackh@firemail.cc>"]
+edition = "2018"
 
 [dependencies]
 unicode-segmentation = "1.7.1"
+thiserror = "1.0.24"
+anyhow = "1.0.40"
