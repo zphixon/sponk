@@ -4,123 +4,9 @@ use crate::prelude::{anyhow, ErrorKind, Result};
 
 use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
-use std::iter::Peekable;
-
-fn is_builtin(s: &str) -> bool {
-    matches!(
-        s,
-        "-" | "`"
-            | "="
-            | "["
-            | "]"
-            | "\\"
-            | ";"
-            | ","
-            | "."
-            | "/"
-            | "~"
-            | "!"
-            | "@"
-            | "#"
-            | "$"
-            | "%"
-            | "^"
-            | "&"
-            | "*"
-            | "("
-            | ")"
-            | "_"
-            | "+"
-            | "{"
-            | "}"
-            | "|"
-            | ":"
-            | "\""
-            | "<"
-            | ">"
-            | "?"
-            | "⋄"
-            | "¨"
-            | "≤"
-            | "≥"
-            | "≠"
-            | "∨"
-            | "∧"
-            | "×"
-            | "÷"
-            | "⍵"
-            | "∊"
-            | "⍴"
-            | "↑"
-            | "↓"
-            | "⍳"
-            | "○"
-            | "←"
-            | "→"
-            | "⊢"
-            | "⍺"
-            | "⌈"
-            | "⌊"
-            | "∇"
-            | "∆"
-            | "∘"
-            | "⎕"
-            | "⍎"
-            | "⍕"
-            | "⊂"
-            | "⊥"
-            | "⊤"
-            | "⍝"
-            | "⍀"
-            | "⌿"
-            | "⌺"
-            | "⌶"
-            | "⍫"
-            | "⍒"
-            | "⍋"
-            | "⌽"
-            | "⍉"
-            | "⊖"
-            | "⍟"
-            | "⍱"
-            | "⌹"
-            | "⍷"
-            | "⍨"
-            | "⍸"
-            | "⍥"
-            | "⍣"
-            | "⍞"
-            | "⍬"
-            | "⊣"
-            | "⍤"
-            | "⌸"
-            | "⌷"
-            | "≡"
-            | "≢"
-            | "⊆"
-            | "⊃"
-            | "∩"
-            | "∪"
-            | "⍪"
-            | "⍙"
-            | "⍠"
-    )
-}
-
-fn is_whitespace(s: &str) -> bool {
-    // TODO: other weird forms of whitespace
-    s.len() == 1 && s.bytes().nth(0).unwrap().is_ascii_whitespace()
-}
-
-fn is_digit(s: &str) -> bool {
-    "0123456789".contains(s)
-}
-
-fn is_identifier(s: &str) -> bool {
-    !is_whitespace(s) && !is_builtin(s)
-}
-
-/// token kind
+/// Kinds of tokens
+///
+/// Tokens that must require symmetry have both forms as token types, the rest fall under Builtin or literal token types.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum TokenKind {
     LeftParen,
@@ -139,6 +25,7 @@ pub enum TokenKind {
     EOF,
 }
 
+/// Indices into a language source
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct Span {
     line: usize,
@@ -146,11 +33,22 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn new(line: usize, grapheme_index_in_line: usize) -> Span {
+    /// Create a new span.
+    pub(crate) fn new(line: usize, grapheme_index_in_line: usize) -> Span {
         Span {
             line,
             grapheme_index_in_line,
         }
+    }
+
+    /// Get the line of the span.
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Get grapheme index in the line of the span.
+    pub fn grapheme_index_in_line(&self) -> usize {
+        self.grapheme_index_in_line
     }
 }
 
@@ -160,7 +58,7 @@ impl std::fmt::Display for Span {
     }
 }
 
-/// token
+/// Tokens with kind, lexeme, and span information
 #[derive(PartialEq, Debug, Clone)]
 pub struct Token {
     kind: TokenKind,
@@ -169,7 +67,7 @@ pub struct Token {
 }
 
 impl Token {
-    /// new
+    /// Create a new token.
     pub(crate) fn new(kind: TokenKind, lexeme: impl ToString, span: Span) -> Token {
         Token {
             kind,
@@ -178,7 +76,8 @@ impl Token {
         }
     }
 
-    pub(crate) fn no_span(kind: TokenKind, lexeme: impl ToString) -> Token {
+    /// Create a token without a span. Only used in this file.
+    pub fn no_span(kind: TokenKind, lexeme: impl ToString) -> Token {
         Token {
             kind,
             lexeme: lexeme.to_string(),
@@ -189,34 +88,41 @@ impl Token {
         }
     }
 
-    pub(crate) fn compare_no_span(&self, other: Token) -> bool {
+    /// Compare a token with another, ignoring span information. Only used in this file.
+    pub fn compare_no_span(&self, other: Token) -> bool {
         self.kind == other.kind && self.lexeme == other.lexeme
     }
 
+    /// Get the kind of the token.
     pub fn kind(&self) -> TokenKind {
         self.kind
     }
 
+    /// Get the lexeme of the token.
     pub fn lexeme(&self) -> &str {
         &self.lexeme
     }
 
+    /// Get the span of the token.
     pub fn span(&self) -> Span {
         self.span
     }
 }
 
+// We want to consider extended grapheme clusters, so we pass true to source.graphemes.
+// Using a const to avoid magic numbers.
 const YES_EXTENDED_GRAPHEMES: bool = true;
 
-/// scanner
+/// A scanner of Sponk language sources
 pub struct Scanner<'a> {
-    graphemes: Peekable<Graphemes<'a>>,
+    graphemes: std::iter::Peekable<Graphemes<'a>>,
     source: &'a str,
     line: usize,
     grapheme_index_in_line: usize,
 }
 
 impl<'a> Scanner<'a> {
+    /// Create a new scanner from a source.
     pub fn new(source: &'a str) -> Scanner<'a> {
         Scanner {
             graphemes: source.graphemes(YES_EXTENDED_GRAPHEMES).peekable(),
@@ -226,17 +132,21 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    // Advance to the next line, only called in next_grapheme.
     fn newline(&mut self) {
         self.line += 1;
         self.grapheme_index_in_line = 0;
     }
 
+    // Get the current span of the scanner.
     fn span(&self) -> Span {
         Span::new(self.line, self.grapheme_index_in_line)
     }
 
+    // Get the next grapheme from the grapheme iterator.
     fn next_grapheme(&mut self) -> Option<&'a str> {
         self.graphemes.next().map(|grapheme| {
+            // increment the line number if necessary
             if grapheme == "\n" {
                 self.newline();
             } else {
@@ -247,13 +157,17 @@ impl<'a> Scanner<'a> {
         })
     }
 
+    // Peek the next grapheme.
     fn peek_grapheme(&mut self) -> Option<&'a str> {
         self.graphemes.peek().cloned()
     }
 
+    /// Get the next token from the source.
     pub fn next_token(&mut self) -> Result<Token> {
+        // get the next grapheme
         let mut grapheme = self.next_grapheme().unwrap_or("");
-        while is_whitespace(grapheme) {
+        while util::is_whitespace(grapheme) {
+            // skip past whitespace
             grapheme = self.next_grapheme().unwrap_or("");
         }
 
@@ -265,20 +179,27 @@ impl<'a> Scanner<'a> {
             g @ "}" => Ok(Token::new(TokenKind::RightBrace, g, self.span())),
             g @ "[" => Ok(Token::new(TokenKind::LeftBracket, g, self.span())),
             g @ "]" => Ok(Token::new(TokenKind::RightBracket, g, self.span())),
-            g @ "¯" => self.number(g),
+            g @ "¯" => self.number(g), // negative number literals use an over-score
             g @ "'" => self.string(g),
-            g if is_builtin(g) => Ok(Token::new(TokenKind::Builtin, g, self.span())),
-            g if is_digit(g) => self.number(g),
-            g if is_whitespace(g) => unreachable!(),
+            g if util::is_builtin(g) => Ok(Token::new(TokenKind::Builtin, g, self.span())),
+            g if util::is_digit(g) => self.number(g),
+            g if util::is_whitespace(g) => unreachable!(),
             g => self.ident(g),
         }
     }
 
+    // Scan a string.
     fn string(&mut self, grapheme: &str) -> Result<Token> {
+        // start creating a string
         let mut string = String::from(grapheme);
+
+        // get the next grapheme
+        // we will early return instead of exiting the loop normally
         while let Some(grapheme) = self.peek_grapheme() {
+            // if we hit a backslash, it's an escape sequence
             if grapheme == "\\" {
                 self.next_grapheme().unwrap();
+                // we only have \' for now, if we had more later use a match statement
                 if let Some(quote) = self.peek_grapheme() {
                     if quote != "'" {
                         return Err(anyhow!(ErrorKind::UnknownEscapeCode {
@@ -286,46 +207,65 @@ impl<'a> Scanner<'a> {
                         }));
                     }
                 }
+                // add the escaped sequence to the string (\' only right now)
                 string.push_str("\\'");
             } else {
+                // add it to the string
                 string.push_str(grapheme);
             }
 
+            // when we've reached the end of the string
             if grapheme == "'" {
                 self.next_grapheme().unwrap();
                 return Ok(Token::new(TokenKind::String, string, self.span()));
             }
 
+            // continue
             self.next_grapheme().unwrap();
         }
 
+        // if we don't have any more tokens and we've made it out of the loop, the string is unterminated
         Err(anyhow!(ErrorKind::UnterminatedString { span: self.span() }))
     }
 
+    // Scan an identifier.
     fn ident(&mut self, grapheme: &str) -> Result<Token> {
+        // start the identifier
         let mut ident = String::from(grapheme);
+
+        // while we have graphemes left
         while let Some(grapheme) = self.peek_grapheme() {
-            if is_identifier(grapheme) {
+            // if the grapheme is ok to put in an identifier (ascii alphanum only currently)
+            if util::is_identifier(grapheme) {
+                // add it to the identifier
                 ident.push_str(grapheme);
             } else {
                 break;
             }
             self.next_grapheme().unwrap();
         }
+
         Ok(Token::new(TokenKind::Ident, ident, self.span()))
     }
 
+    // Scan a number.
     fn number(&mut self, grapheme: &str) -> Result<Token> {
+        // start the identifier
         let mut number = String::from(grapheme);
 
+        // while we still have graphemes
         while let Some(grapheme) = self.peek_grapheme() {
-            if is_digit(grapheme) {
+            // if it's a digit, add it to the number
+            if util::is_digit(grapheme) {
                 number.push_str(grapheme);
             } else if grapheme == "." {
+                // if we find a . we're scanning a float, continue doing that
                 return self.float(number);
             } else if grapheme == "J" || grapheme == "j" {
+                // if we find a j it's a complex number
                 return self.complex(number);
             } else if grapheme == "E" || grapheme == "e" {
+                // e is scientific notation
                 return self.scientific(number);
             } else {
                 break;
@@ -336,7 +276,7 @@ impl<'a> Scanner<'a> {
         Ok(Token::new(
             TokenKind::Int(number.replace("¯", "-").parse::<i64>().map_err(|e| {
                 ErrorKind::SyntaxError {
-                    // TODO there's probably a better wya of doing this
+                    // TODO there's probably a better way of doing this
                     why: anyhow!(e),
                     span: self.span(),
                 }
@@ -346,12 +286,15 @@ impl<'a> Scanner<'a> {
         ))
     }
 
+    // Scan a floating-point number.
     fn float(&mut self, mut number: String) -> Result<Token> {
+        // sanity
         assert_eq!(".", self.next_grapheme().unwrap());
         number.push('.');
 
+        // get the rest of the number, jumping out if it's not a simple float
         while let Some(grapheme) = self.peek_grapheme() {
-            if is_digit(grapheme) {
+            if util::is_digit(grapheme) {
                 number.push_str(grapheme);
             } else if grapheme == "J" || grapheme == "j" {
                 return self.complex_float(number);
@@ -400,6 +343,124 @@ impl Iterator for Scanner<'_> {
     type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token().ok().filter(|t| t.kind != TokenKind::EOF)
+    }
+}
+
+mod util {
+    /// Matches all symbols, minus single quote and one other that I don't remember lol
+    pub(crate) fn is_builtin(s: &str) -> bool {
+        matches!(
+            s,
+            "-" | "`"
+                | "="
+                | "["
+                | "]"
+                | "\\"
+                | ";"
+                | ","
+                | "."
+                | "/"
+                | "~"
+                | "!"
+                | "@"
+                | "#"
+                | "$"
+                | "%"
+                | "^"
+                | "&"
+                | "*"
+                | "("
+                | ")"
+                | "_"
+                | "+"
+                | "{"
+                | "}"
+                | "|"
+                | ":"
+                | "\""
+                | "<"
+                | ">"
+                | "?"
+                | "⋄"
+                | "¨"
+                | "≤"
+                | "≥"
+                | "≠"
+                | "∨"
+                | "∧"
+                | "×"
+                | "÷"
+                | "⍵"
+                | "∊"
+                | "⍴"
+                | "↑"
+                | "↓"
+                | "⍳"
+                | "○"
+                | "←"
+                | "→"
+                | "⊢"
+                | "⍺"
+                | "⌈"
+                | "⌊"
+                | "∇"
+                | "∆"
+                | "∘"
+                | "⎕"
+                | "⍎"
+                | "⍕"
+                | "⊂"
+                | "⊥"
+                | "⊤"
+                | "⍝"
+                | "⍀"
+                | "⌿"
+                | "⌺"
+                | "⌶"
+                | "⍫"
+                | "⍒"
+                | "⍋"
+                | "⌽"
+                | "⍉"
+                | "⊖"
+                | "⍟"
+                | "⍱"
+                | "⌹"
+                | "⍷"
+                | "⍨"
+                | "⍸"
+                | "⍥"
+                | "⍣"
+                | "⍞"
+                | "⍬"
+                | "⊣"
+                | "⍤"
+                | "⌸"
+                | "⌷"
+                | "≡"
+                | "≢"
+                | "⊆"
+                | "⊃"
+                | "∩"
+                | "∪"
+                | "⍪"
+                | "⍙"
+                | "⍠"
+        )
+    }
+
+    pub(crate) fn is_whitespace(s: &str) -> bool {
+        // TODO: other weird forms of whitespace
+        s.len() == 1 && s.bytes().nth(0).unwrap().is_ascii_whitespace()
+    }
+
+    pub(crate) fn is_digit(s: &str) -> bool {
+        "0123456789".contains(s)
+    }
+
+    /// Grapheme can be in an identifier if it's not ascii whitespace or builtin
+    pub(crate) fn is_identifier(s: &str) -> bool {
+        !is_whitespace(s) && !is_builtin(s)
     }
 }
 

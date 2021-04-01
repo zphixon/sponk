@@ -1,77 +1,41 @@
-//! parser
-
 use crate::prelude::Token;
 
-/// syntax tree
 pub enum Statement {
-    /// assign
-    Assign {
-        /// name
-        name: Token,
-        /// expression
-        expression: Expression,
-    },
-    /// assign quote
-    AssignQuote {
-        /// name
-        name: Token,
-        /// expression
-        expression: Expression,
-    },
+    Assign { name: Token, expression: Expression },
+    AssignQuote { name: Token, expression: Expression },
     Expression(Expression),
 }
 
 pub enum Expression {
-    /// identifier
     Ident {
-        /// name
         name: Token,
     },
-    /// list
     List {
-        /// value
         value: Vec<Token>,
     },
-    /// monad call
     MonadCall {
-        /// operator
         op: Box<Expression>,
-        /// operand
         lhs: Box<Expression>,
     },
-    /// dyad call
     DyadCall {
-        /// rhs operand
         rhs: Box<Expression>,
-        /// operator
         op: Box<Expression>,
-        /// lhs operand
         lhs: Box<Expression>,
     },
-    /// quote
     Quote {
-        /// colon
         colon: Token,
-        /// expression
         expression: Box<Expression>,
     },
-    /// call
     Call {
         expression: Box<Expression>,
         colon: Token,
     },
-    /// spread
     Spread {
-        /// verb
         verb: Box<Expression>,
-        /// slash
         slash: Token,
     },
-    /// anon function
     Lambda {
-        /// left brace
         left_brace: Token,
-        /// expr
         expression: Box<Expression>,
     },
 }
@@ -120,11 +84,3 @@ mod test {
         };
     }
 }
-
-// x =. 1 2 3 4 5
-// y =. 6 7 8 9 10
-// x + y
-// # $ x
-// {] + ]} x
-// {1+]} (f 1 2 3 4 5)
-// amp :=: [:[ ]: [:]

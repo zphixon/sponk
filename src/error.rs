@@ -1,10 +1,7 @@
-//! error
-
 use crate::prelude::Span;
 
 use thiserror::Error;
 
-/// error
 #[derive(Error, Debug)]
 pub enum ErrorKind {
     #[error("Syntax error: {why}\nat {span}")]
