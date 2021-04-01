@@ -16,13 +16,6 @@ I love the shit out of them.
 
 symbols:
 
-```
-`1234567890-=qwertyuiop[]\asdfghjkl;'zxcvbnm,./
-~!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:"ZXCVBNM<>?
-⋄¨¯<≤=≥>≠∨∧×÷?⍵∊⍴~↑↓⍳○*←→⊢⍺⌈⌊_∇∆∘'⎕⍎⍕⊂⊥⊤|⍝⍀⌿
-⌺⌶⍫⍒⍋⌽⍉⊖⍟⍱!⌹⍷⍨⍸⍥⍣⍞⍬⊣⍺⍤⌸⌷≡≢⊆⊃∩∪⍪⍙⍠
-```
-
 ## lil ideas
 
 if ⍴⍴array > 2 you can name the ranks??? that sounds super dope, and select ranks like ⌽⍉⊖ with those names instead of
@@ -60,9 +53,6 @@ Sponk operates on n-dimensional arrays.
 5
     ⍴⍴ x
 1
-    # x
-5
-    ⍝ there *is* a difference between ⍴ and #!
 ```
 
 You can manipulate arrays with several operators.
@@ -205,49 +195,55 @@ e.g.
 db - Doubles the right argument.
 ```
 
-### Shape as structure
+### Shape as type
 
 Matrices are super cool, but they aren't all that useful if you want to assign more meaningful structure to your data.
 Hence some mechanisms available for adding semantic structure to your data.
 
 ```apl
     ⍝ we all know and love types, but classic APL/J/etc don't really *do* them very well.
-    ⍝ I don't really think array-based languages are good for 
+    ⍝ hence row polymorphism - it's *literally in the name!* essentially a statically-checked
+    ⍝ form of duck typing.
 
     ⍝ say you want to represent a person. what you might do in APL:
     robert ← 'Robert Dufresne' 1992 6 4
     ⍝ and just remember that the first item of a person is their name, the second is their birth year, and so on.
     ⍝ or, use types!! note that strings are true character vectors. this robert is a 'mixed vector'.
 
-    ⍝ dyad ⎕ defines a type constructor. you must quote the inner types as atoms:
+    ⍝ ⍺⎕⍵ defines ⍺ as a type constructor of ⍵. you must quote the inner types as atoms:
     ∆name ⎕ ∆str
     ∆year ⎕ ∆int
     ∆month ⎕ ∆int
     ∆day ⎕ ∆int
     ∆person ⎕ ∆name ∆year ∆month ∆day
+    
+    ⍝ perhaps think of ∆person as a record type.
 
     ⍝ use the type constructor with a 2xn shape array:
     robert ← person (name 'Robert Dufresne') (year 1992) (month 6) (day 4)
 
+    ⍝ normal shape as expected. ∆person has four properties, and so:
     ⍴ robert
-∆name ∆year ∆month ∆day
-    # robert     ⍝ dope!
 4
-    
+
+    ⍝ ⎕⍵ finds the properties of ⍵:
+    ⎕ robert
+∆name ∆year ∆month ∆day
+
     ⍝ use ⌷ to get each property
     ∆name ⌷ robert
 'Robert Dufresne'
     ∆year ⌷ robert
 1992
 
-    ⍝ another
+    ⍝ another friend
     michael ← person (name 'Michael Tomlinson') (year 1989) (month 8) (day 17)
 
     ⍝ and now, for a magic trick
     people ← robert,michael
     people
-person (name 'Robert Dufresne') (year 1992) (month 6) (day 4)
-person (name 'Michael Tomlinson') (year 1989) (month 8) (day 17)
+(∆name 'Robert Dufresne') (∆year 1992) (∆month 6) (∆day 4)
+(∆name 'Michael Tomlinson') (∆year 1989) (∆month 8) (∆day 17)
 
     ∆name ⌷ people
 'Robert Dufresne' 'Michael Tomlinson'
@@ -287,25 +283,35 @@ person (name 'Michael Tomlinson') (year 1989) (month 8) (day 17)
     (⊖Prod)[2;2;3]
 26
 
-    ⍝ define a shape-type with ⎕
-    ∆year ⎕ ∆int
+    ⍝ we can do better:
     ∆line ⎕ ∆int
-    ∆month ⎕ ∆int
-    ∆productionLine ⎕ ∆year ∆line ∆month
+    ∆year ⎕ ∆line
+    ∆productionLine ⎕ ∆year
 
     ⍝ write Prod initially like
-    Prod ← ∆productionLine ((26 16 22 17 ...) (43 36 47 49 ...)) ((44 21 ...) ...) ...
+    Prod ← productionLine (year
+                            (line 26 22 17 ...)
+                            (line 43 36 47 ...)
+                            ...)
+                          (year
+                            ...)
+    ⍝ or import from a database
 
-    ⍝ or reshape the existing prod
+    ⍝ or reshape the existing Prod to give it type information cheaply
     newProd ← ∆productionLine ⍴ Prod
-    ⍴ newProd
-∆year ∆line ∆month
-    (∆year 2) (∆line 2) (∆month 3) ⌷⊖newProd
+
+    ⎕ newProd
+∆year
+    ⎕ (year 2) ⌷ newProd
+∆line
+
+    (year 2) (line 2) 3 ⌷⊖newProd
 26
-    (⊖newProd)[∆year 2; ∆line 2; ∆month 3]
+    (⊖newProd)[year 2; line 2; 3]
 26
 
-    ⍝ the ⌷ syntax for indexing is better don't @ me
+    ⍝ perhaps given a function month to find the number of the month given its name,
+    (year 2) (line 2) (month 'March') ⌷⊖newProd
 ```
 
 ### Spread, unquote
